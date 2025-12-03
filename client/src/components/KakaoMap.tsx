@@ -18,7 +18,6 @@ export default function KakaoMap({
   initialLocation,
   selectedLocation,
   onLocationSelect,
-  isLoading,
 }: KakaoMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -39,45 +38,51 @@ export default function KakaoMap({
     markerInstance.current.setMap(mapInstance.current);
   }, []);
 
-  // 최초 지도 생성은 컴포넌트 마운트 시 단 한 번만 수행
+  // 지도 초기화
   useEffect(() => {
-    if (!window.kakao || !mapRef.current) return;
+    const kakao = window.kakao;
+    if (!kakao || !mapRef.current) return;
 
-    const defaultLat = initialLocation?.lat ?? 37.5665;
-    const defaultLng = initialLocation?.lng ?? 126.978;
-    const mapOption = {
-      center: new window.kakao.maps.LatLng(defaultLat, defaultLng),
-      level: 3,
-    };
+    kakao.maps.load(() => {
+      const defaultLat = initialLocation?.lat ?? 37.5665;
+      const defaultLng = initialLocation?.lng ?? 126.978;
 
-    mapInstance.current = new window.kakao.maps.Map(mapRef.current, mapOption);
+      const mapOption = {
+        center: new kakao.maps.LatLng(defaultLat, defaultLng),
+        level: 3,
+      };
 
-    // 지도 클릭 이벤트 등록
-    window.kakao.maps.event.addListener(mapInstance.current, "click", function (mouseEvent: any) {
-      const latlng = mouseEvent.latLng;
-      if (onLocationSelect) {
-        onLocationSelect({ lat: latlng.getLat(), lng: latlng.getLng() });
+      mapInstance.current = new kakao.maps.Map(mapRef.current, mapOption);
+
+      kakao.maps.event.addListener(
+        mapInstance.current,
+        "click",
+        (mouseEvent: any) => {
+          const latlng = mouseEvent.latLng;
+          if (onLocationSelect) {
+            onLocationSelect({
+              lat: latlng.getLat(),
+              lng: latlng.getLng(),
+            });
+          }
+        }
+      );
+
+      if (selectedLocation) {
+        addMarker(selectedLocation.lat, selectedLocation.lng);
       }
     });
-
-    // 최초 마커
-    if (selectedLocation) {
-      addMarker(selectedLocation.lat, selectedLocation.lng);
-      mapInstance.current.setCenter(new window.kakao.maps.LatLng(selectedLocation.lat, selectedLocation.lng));
-    }
-    // eslint-disable-next-line
   }, []);
 
-  // selectedLocation이 바뀔 때마다 지도 중심과 마커 이동
+  // 선택된 위치 바뀔 때마다 업데이트
   useEffect(() => {
-    if (!window.kakao || !mapInstance.current) return;
-    if (selectedLocation) {
-      addMarker(selectedLocation.lat, selectedLocation.lng);
-      mapInstance.current.setCenter(new window.kakao.maps.LatLng(selectedLocation.lat, selectedLocation.lng));
-    }
+    if (!window.kakao || !mapInstance.current || !selectedLocation) return;
+
+    addMarker(selectedLocation.lat, selectedLocation.lng);
+    mapInstance.current.setCenter(
+      new window.kakao.maps.LatLng(selectedLocation.lat, selectedLocation.lng)
+    );
   }, [selectedLocation, addMarker]);
 
-  return (
-    <div ref={mapRef} className="w-full h-full rounded-lg overflow-hidden bg-gray-800" />
-  );
+  return <div ref={mapRef} className="w-full h-full rounded-lg overflow-hidden bg-gray-800" />;
 }
