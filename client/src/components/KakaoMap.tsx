@@ -5,7 +5,6 @@ interface KakaoMapProps {
   initialLocation?: LocationData | null;
   selectedLocation?: LocationData | null;
   onLocationSelect?: (location: LocationData) => void;
-  isLoading?: boolean;
 }
 
 declare global {
@@ -38,35 +37,25 @@ export default function KakaoMap({
     markerInstance.current.setMap(mapInstance.current);
   }, []);
 
-  // 지도 초기화
   useEffect(() => {
-    const kakao = window.kakao;
-    if (!kakao || !mapRef.current) return;
+    if (!window.kakao || !mapRef.current) return;
 
-    kakao.maps.load(() => {
+    window.kakao.maps.load(() => {
       const defaultLat = initialLocation?.lat ?? 37.5665;
       const defaultLng = initialLocation?.lng ?? 126.978;
 
       const mapOption = {
-        center: new kakao.maps.LatLng(defaultLat, defaultLng),
+        center: new window.kakao.maps.LatLng(defaultLat, defaultLng),
         level: 3,
       };
 
-      mapInstance.current = new kakao.maps.Map(mapRef.current, mapOption);
+      mapInstance.current = new window.kakao.maps.Map(mapRef.current, mapOption);
 
-      kakao.maps.event.addListener(
-        mapInstance.current,
-        "click",
-        (mouseEvent: any) => {
-          const latlng = mouseEvent.latLng;
-          if (onLocationSelect) {
-            onLocationSelect({
-              lat: latlng.getLat(),
-              lng: latlng.getLng(),
-            });
-          }
-        }
-      );
+      // 지도 클릭
+      window.kakao.maps.event.addListener(mapInstance.current, "click", (mouseEvent: any) => {
+        const latlng = mouseEvent.latLng;
+        onLocationSelect?.({ lat: latlng.getLat(), lng: latlng.getLng() });
+      });
 
       if (selectedLocation) {
         addMarker(selectedLocation.lat, selectedLocation.lng);
@@ -74,15 +63,16 @@ export default function KakaoMap({
     });
   }, []);
 
-  // 선택된 위치 바뀔 때마다 업데이트
   useEffect(() => {
-    if (!window.kakao || !mapInstance.current || !selectedLocation) return;
+    if (!window.kakao || !mapInstance.current) return;
 
-    addMarker(selectedLocation.lat, selectedLocation.lng);
-    mapInstance.current.setCenter(
-      new window.kakao.maps.LatLng(selectedLocation.lat, selectedLocation.lng)
-    );
+    if (selectedLocation) {
+      addMarker(selectedLocation.lat, selectedLocation.lng);
+      mapInstance.current.setCenter(
+        new window.kakao.maps.LatLng(selectedLocation.lat, selectedLocation.lng)
+      );
+    }
   }, [selectedLocation, addMarker]);
 
-  return <div ref={mapRef} className="w-full h-full rounded-lg overflow-hidden bg-gray-800" />;
+  return <div ref={mapRef} className="w-full h-full rounded-lg overflow-hidden" />;
 }
