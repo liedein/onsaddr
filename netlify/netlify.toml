@@ -1,0 +1,12 @@
+[build]
+  # Vite 빌드 결과물이 있는 폴더
+  publish = "dist"
+  
+  # Functions 폴더 위치
+  functions = "netlify/functions"
+
+# Redirects (선택, SPA 라우팅을 위해)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
