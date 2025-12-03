@@ -1,8 +1,13 @@
 [build]
-  publish = "dist/public"           # Vite 빌드 결과물 경로
-  functions = "netlify/functions"   # Functions 폴더 경로
+  publish = "dist/public"
+  command = "npm run build"
+  functions = "netlify/functions"
 
-# API 경로 리다이렉트 (중요!)
+# 환경 설정
+[build.environment]
+  NODE_VERSION = "20"
+
+# API 경로 리다이렉트
 [[redirects]]
   from = "/api/usage"
   to = "/.netlify/functions/usage"
@@ -18,8 +23,28 @@
   to = "/.netlify/functions/static-map"
   status = 200
 
-# SPA 라우팅 (맨 마지막에 위치해야 함!)
+# API 경로 전체 처리 (추가 API용)
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA 라우팅 (맨 마지막 필수!)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# 헤더 설정
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
