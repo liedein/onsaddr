@@ -165,7 +165,7 @@ export default function Home() {
               ))}
             </select>
           </div>
-          {/* 위도/경도 + 복사버튼 */}
+
           <div className="flex items-stretch space-x-2">
             <div className="flex flex-col flex-1 space-y-2">
               <div className="flex items-center">
@@ -203,6 +203,7 @@ export default function Home() {
               복사
             </button>
           </div>
+
           <div className="flex items-center mb-1">
             <label className="text-sm text-gray-300 w-16 shrink-0">지번주소</label>
             <input
@@ -212,6 +213,7 @@ export default function Home() {
               placeholder="위치를 선택해주세요"
             />
           </div>
+
           <div className="flex items-start">
             <label className="text-sm text-gray-300 w-16 shrink-0 mt-2">세부내역</label>
             <textarea
@@ -224,6 +226,7 @@ export default function Home() {
               style={{ minHeight: "3.2em", maxHeight: "4em" }}
             />
           </div>
+
           <div className="mt-3 text-center pb-0">
             <span className="text-sm text-gray-300">오늘 조회 횟수: </span>
             <span className="text-sm text-emerald-400 font-medium">{usageCount}</span>
