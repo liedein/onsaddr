@@ -1,0 +1,25 @@
+[build]
+  publish = "dist/public"           # Vite 빌드 결과물 경로
+  functions = "netlify/functions"   # Functions 폴더 경로
+
+# API 경로 리다이렉트 (중요!)
+[[redirects]]
+  from = "/api/usage"
+  to = "/.netlify/functions/usage"
+  status = 200
+
+[[redirects]]
+  from = "/api/coordinate-to-address"
+  to = "/.netlify/functions/coordinate-to-address"
+  status = 200
+
+[[redirects]]
+  from = "/api/static-map"
+  to = "/.netlify/functions/static-map"
+  status = 200
+
+# SPA 라우팅 (맨 마지막에 위치해야 함!)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

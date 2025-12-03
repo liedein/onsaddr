@@ -1,8 +1,0 @@
-[build]
-  publish = "dist"                 # Vite 빌드 결과물
-  functions = "netlify/functions"  # Functions 폴더 경로
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
