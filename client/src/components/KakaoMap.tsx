@@ -23,7 +23,7 @@ export default function KakaoMap({
   const markerInstance = useRef<any>(null);
 
   const addMarker = useCallback((lat: number, lng: number) => {
-    if (!mapInstance.current || !window.kakao) return;
+    if (!mapInstance.current || !window.kakao?.maps) return;
 
     if (markerInstance.current) {
       markerInstance.current.setMap(null);
@@ -43,7 +43,6 @@ export default function KakaoMap({
     window.kakao.maps.load(() => {
       const defaultLat = initialLocation?.lat ?? 37.5665;
       const defaultLng = initialLocation?.lng ?? 126.978;
-
       const mapOption = {
         center: new window.kakao.maps.LatLng(defaultLat, defaultLng),
         level: 3,
@@ -51,12 +50,15 @@ export default function KakaoMap({
 
       mapInstance.current = new window.kakao.maps.Map(mapRef.current, mapOption);
 
-      // 지도 클릭
       window.kakao.maps.event.addListener(mapInstance.current, "click", (mouseEvent: any) => {
         const latlng = mouseEvent.latLng;
-        onLocationSelect?.({ lat: latlng.getLat(), lng: latlng.getLng() });
+        onLocationSelect?.({
+          lat: latlng.getLat(),
+          lng: latlng.getLng(),
+        });
       });
 
+      // 최초 마커 위치 적용
       if (selectedLocation) {
         addMarker(selectedLocation.lat, selectedLocation.lng);
       }
@@ -64,9 +66,7 @@ export default function KakaoMap({
   }, []);
 
   useEffect(() => {
-    if (!window.kakao || !mapInstance.current) return;
-
-    if (selectedLocation) {
+    if (window.kakao?.maps && mapInstance.current && selectedLocation) {
       addMarker(selectedLocation.lat, selectedLocation.lng);
       mapInstance.current.setCenter(
         new window.kakao.maps.LatLng(selectedLocation.lat, selectedLocation.lng)
