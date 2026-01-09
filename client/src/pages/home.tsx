@@ -6,7 +6,7 @@ import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { RefreshCw } from "lucide-react";
 
 const telcoOptions = ["KT", "LGU", "KT+LGU"];
-const targetOptions = ["도로", "교차로", "건물", "철도", "등산로", "해상로로", "기타"];
+const targetOptions = ["도로", "교차로", "건물", "철도", "등산로", "해상로", "기타"];
 
 export interface LocationData {
   lat: number;
