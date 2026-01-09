@@ -5,8 +5,8 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { RefreshCw } from "lucide-react";
 
-const telcoOptions = ["KT", "LGU"];
-const typeOptions = ["단독시설", "불법시설물", "특이동향"];
+const telcoOptions = ["KT", "LGU", "KT+LGU"];
+const targetOptions = ["도로", "교차로", "건물", "철도", "등산로", "해상로로", "기타"];
 
 export interface LocationData {
   lat: number;
@@ -23,7 +23,8 @@ export interface ToastData {
 export default function Home() {
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [telco, setTelco] = useState("");
-  const [type, setType] = useState("");
+  const [target, setTarget] = useState("");
+  const [customTarget, setCustomTarget] = useState("");
   const [detail, setDetail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -71,18 +72,20 @@ export default function Home() {
     } catch (error) {
       console.error("주소 변환 오류:", error);
       showToast(error instanceof Error ? error.message : "주소를 가져오는데 실패했습니다.", "error");
-    } 
+    }
   };
 
   const handleCopyToClipboard = async () => {
-    if (!selectedLocation || !selectedLocation.address || !telco || !type) {
+    const finalTarget = target === "기타" ? customTarget : target;
+
+    if (!selectedLocation || !selectedLocation.address || !telco || !finalTarget) {
       showToast("모든 값을 선택해주세요.", "error");
       return;
     }
 
     const copyText =
       `통신사: ${telco}\n` +
-      `유형: ${type}\n` +
+      `서비스 타겟: ${finalTarget}\n` +
       `위도: ${selectedLocation.lat.toFixed(6)}\n` +
       `경도: ${selectedLocation.lng.toFixed(6)}\n` +
       `지번주소: ${selectedLocation.address}\n` +
@@ -156,15 +159,25 @@ export default function Home() {
             </select>
             <select
               className="bg-gray-100 text-gray-900 text-sm px-3 py-2 rounded-md flex-1"
-              value={type}
-              onChange={e => setType(e.target.value)}
+              value={target}
+              onChange={e => setTarget(e.target.value)}
             >
-              <option value="">유형 선택</option>
-              {typeOptions.map(opt => (
+              <option value="">서비스 타겟 선택</option>
+              {targetOptions.map(opt => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
           </div>
+
+          {target === "기타" && (
+            <input
+              type="text"
+              className="bg-gray-100 text-gray-900 text-sm px-3 py-2 rounded-md"
+              value={customTarget}
+              onChange={e => setCustomTarget(e.target.value)}
+              placeholder="서비스 타겟을 직접 입력하세요"
+            />
+          )}
 
           <div className="flex items-stretch space-x-2">
             <div className="flex flex-col flex-1 space-y-2">
@@ -188,7 +201,7 @@ export default function Home() {
             <button
               onClick={handleCopyToClipboard}
               aria-label="클립보드 복사"
-              disabled={!selectedLocation?.address || !telco || !type || isLoading}
+              disabled={!selectedLocation?.address || !telco || !(target === "기타" ? customTarget : target) || isLoading}
               className="flex flex-col items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-colors duration-200 w-[60px] h-full disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 fontSize: "1.15rem",
@@ -196,6 +209,7 @@ export default function Home() {
                 minHeight: "86px",
               }}
             >
+
               <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2" stroke="currentColor" fill="none"/>
                 <rect x="3" y="3" width="13" height="13" rx="2" strokeWidth="2" stroke="currentColor" fill="none"/>
