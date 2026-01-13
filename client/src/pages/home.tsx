@@ -288,7 +288,7 @@ export default function Home() {
 
           {/* 조회 횟수 표시 영역 */}
           <div className="mt-3 text-center pb-0 border-t border-gray-700 pt-3">
-            <span className="text-sm text-gray-300">오늘 기기 조회 횟수: </span>
+            <span className="text-sm text-gray-300">금일 조회 횟수: </span>
             <span className="text-sm text-emerald-400 font-medium">{usageCount}</span>
             <span className="text-sm text-gray-300"> / {USAGE_LIMIT}</span>
           </div>
