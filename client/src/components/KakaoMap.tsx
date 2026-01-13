@@ -33,7 +33,7 @@ const KakaoMap = memo(function KakaoMap({
 
       const mapOption = {
         center: new window.kakao.maps.LatLng(defaultLat, defaultLng),
-        level: 3,
+        level: 2,
       };
 
       // 지도 객체 생성
