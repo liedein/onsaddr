@@ -25,6 +25,7 @@ export default function Home() {
   const [telco, setTelco] = useState("");
   const [target, setTarget] = useState("");
   const [customTarget, setCustomTarget] = useState("");
+  const [subAddress, setSubAddress] = useState(""); // 1. 상세위치 상태 추가
   const [detail, setDetail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -83,12 +84,14 @@ export default function Home() {
       return;
     }
 
+    // 2. 복사 텍스트에 상세위치(subAddress) 항목 추가
     const copyText =
       `통신사: ${telco}\n` +
       `서비스 타겟: ${finalTarget}\n` +
       `위도: ${selectedLocation.lat.toFixed(6)}\n` +
       `경도: ${selectedLocation.lng.toFixed(6)}\n` +
       `지번주소: ${selectedLocation.address}\n` +
+      `상세위치: ${subAddress}\n` +
       `세부내역: ${detail}`;
 
     try {
@@ -209,7 +212,6 @@ export default function Home() {
                 minHeight: "86px",
               }}
             >
-
               <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2" stroke="currentColor" fill="none"/>
                 <rect x="3" y="3" width="13" height="13" rx="2" strokeWidth="2" stroke="currentColor" fill="none"/>
@@ -225,6 +227,17 @@ export default function Home() {
               value={selectedLocation?.address || ""}
               readOnly
               placeholder="위치를 선택해주세요"
+            />
+          </div>
+
+          {/* 3. 지번주소 아래 상세위치 입력 칸 추가 */}
+          <div className="flex items-center mb-1">
+            <label className="text-sm text-gray-300 w-16 shrink-0">상세위치</label>
+            <input
+              className="text-base bg-gray-100 text-gray-900 px-3 py-2 rounded-md flex-1"
+              value={subAddress}
+              onChange={e => setSubAddress(e.target.value)}
+              placeholder="상세 건물명, 호수 등을 입력하세요"
             />
           </div>
 
