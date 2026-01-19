@@ -1,6 +1,6 @@
 {
     "name": "내 주변 주소 조회",
-    "short_name": "주소조회",
+    "short_name": "내주변주소조회",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#000000",
