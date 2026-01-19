@@ -201,18 +201,18 @@ export default function Home() {
 
         <div className="bg-gray-800 border-t border-gray-700 pt-5 pb-4 px-2 flex flex-col space-y-3">
           <div className="flex items-center space-x-3">
-            <select className="bg-gray-100 text-gray-900 text-sm px-3 py-2 rounded-md flex-1" value={telco} onChange={e => setTelco(e.target.value)}>
+            <select className="bg-gray-100 text-gray-900 text-base px-3 py-2 rounded-md flex-1" value={telco} onChange={e => setTelco(e.target.value)}>
               <option value="">통신사 선택</option>
               {telcoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
-            <select className="bg-gray-100 text-gray-900 text-sm px-3 py-2 rounded-md flex-1" value={target} onChange={e => setTarget(e.target.value)}>
+            <select className="bg-gray-100 text-gray-900 text-base px-3 py-2 rounded-md flex-1" value={target} onChange={e => setTarget(e.target.value)}>
               <option value="">서비스 타겟 선택</option>
               {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
 
           {target === "기타" && (
-            <input type="text" className="bg-gray-100 text-gray-900 text-sm px-3 py-2 rounded-md" value={customTarget} onChange={e => setCustomTarget(e.target.value)} placeholder="서비스 타겟을 직접 입력하세요" />
+            <input type="text" className="bg-gray-100 text-gray-900 text-base px-3 py-2 rounded-md" value={customTarget} onChange={e => setCustomTarget(e.target.value)} placeholder="서비스 타겟을 직접 입력하세요" />
           )}
 
           <div className="flex items-stretch space-x-2">
