@@ -1,9 +1,9 @@
+import { useAddToHomeScreen } from "@/hooks/useAddToHomeScreen";
 import { useState, useEffect } from "react";
 import KakaoMap from "@/components/KakaoMap";
 import ToastNotification from "@/components/ToastNotification";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { RefreshCw } from "lucide-react";
-import { useAddToHomeScreen } from "@/hooks/useAddToHomeScreen";
 
 const telcoOptions = ["KT", "LGU", "KT+LGU"];
 const targetOptions = ["도로", "교차로", "건물", "철도", "등산로", "해상로", "기타"];
@@ -149,45 +149,39 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-50 flex flex-col">
       <header className="bg-gray-800 shadow-lg border-b border-gray-700">
-       <div className="flex w-full items-center px-4 py-4">
-        {/* 👇 기존 w-12 → 설치 버튼으로 변경 */}
-        <div className="w-12 flex items-center">
-          {isSupported && canInstall && (
-            <button
-              type="button"
-              onClick={promptToInstall}
-              className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95"
-              aria-label="홈 화면에 추가"
-              title="홈 화면에 추가"
-            >
-              {isSupported && canInstall ? (
+        <div className="flex w-full items-center px-4 py-4">
+          <div className="w-12 flex items-center">
+            {isSupported && canInstall && (
+              <button
+                type="button"
+                onClick={promptToInstall}
+                className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95"
+                aria-label="홈 화면에 추가"
+                title="홈 화면에 추가"
+              >
                 <img 
                   src="/icons/mapaddr_32.png" 
                   alt="홈 화면에 추가" 
                   className="w-6 h-6"
                 />
-              ) : (
-                <RefreshCw className="w-6 h-6" />
-              )}
+              </button>
+            )}
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-50 flex-grow text-center tracking-wide">
+            내 주변 주소 조회
+          </h1>
+
+          <div className="w-12 flex justify-end">
+            <button 
+              onClick={handleRefresh} 
+              className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-6 h-6" />
             </button>
-        </button>
-      )}
-    </div>
-
-    <h1 className="text-2xl font-bold text-gray-50 flex-grow text-center tracking-wide">
-      내 주변 주소 조회
-    </h1>
-
-    <div className="w-12 flex justify-end">
-      <button 
-        onClick={handleRefresh} 
-        className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
-      >
-        <RefreshCw className="w-6 h-6" />
-      </button>
-    </div>
-  </div>
-</header>
+          </div>
+        </div>
+      </header>
 
 
       <main className="flex-1 flex flex-col relative">
