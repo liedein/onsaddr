@@ -90,7 +90,6 @@ export default function Home() {
 
   const handleModeToggle = () => {
     if (mode === "MAP") {
-      // 요구사항 12: 모드 전환 전 Pin 중심 확인
       if (!mapCompRef.current?.isMarkerAtCenter()) {
         showToast("Pin이 지도 중심에 있지 않습니다. 핀을 중앙에 놓아주세요.", "error");
         return;
@@ -102,7 +101,9 @@ export default function Home() {
   };
 
   const handleLocationSelect = async (location: LocationData) => {
-    if (mode === "ANT") return; // ANT 모드에선 위치 선택 막음
+    // ANT 모드에서는 위치 선택 로직 실행 안함 (안전장치)
+    if (mode === "ANT") return;
+    
     if (usageCount >= USAGE_LIMIT) {
       showToast("오늘 조회 한도(100회)에 도달했습니다.", "error");
       return;
@@ -191,25 +192,17 @@ export default function Home() {
   const handleRefresh = () => window.location.reload();
 
   const antColors = {
-    1: { name: 'rose', hex: "#f43f5e", bg: 'bg-rose-500', active: 'bg-rose-700' },
-    2: { name: 'emerald', hex: "#10b981", bg: 'bg-emerald-500', active: 'bg-emerald-700' },
-    3: { name: 'sky', hex: "#0ea5e9", bg: 'bg-sky-500', active: 'bg-sky-700' },
-    4: { name: 'violet', hex: "#8b5cf6", bg: 'bg-violet-500', active: 'bg-violet-700' },
+    1: { hex: "#f43f5e", bg: 'bg-rose-500', active: 'bg-rose-700' },
+    2: { hex: "#10b981", bg: 'bg-emerald-500', active: 'bg-emerald-700' },
+    3: { hex: "#0ea5e9", bg: 'bg-sky-500', active: 'bg-sky-700' },
+    4: { hex: "#8b5cf6", bg: 'bg-violet-500', active: 'bg-violet-700' },
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-50 flex flex-col">
       <header className="bg-gray-800 shadow-lg border-b border-gray-700">
         <div className="flex w-full items-center px-4 py-4">
-          <div className="w-1/5 flex items-center space-x-2">
-            <button
-              onClick={handleModeToggle}
-              className={`px-3 py-1.5 rounded-md font-bold text-sm transition-all duration-200 active:scale-95 shadow-md ${
-                mode === "MAP" ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-orange-600 hover:bg-orange-700 text-white"
-              }`}
-            >
-              {mode}
-            </button>
+          <div className="w-12 flex items-center">
             {isSupported && canInstall && (
               <button
                 type="button"
@@ -244,9 +237,9 @@ export default function Home() {
             selectedLocation={selectedLocation}
             onLocationSelect={handleLocationSelect}
             isLoading={isLoading || isLoadingLocation}
+            mode={mode} // 요구사항 2 반영을 위해 모드 전달
           />
           
-          {/* 화살표 SVG 레이어 */}
           <svg className="absolute inset-0 pointer-events-none w-full h-full z-10">
             {Object.entries(antData).map(([key, data]) => {
               if (!data) return null;
@@ -260,7 +253,6 @@ export default function Home() {
             })}
           </svg>
 
-          {/* ANT 모드 버튼 4개 */}
           {mode === "ANT" && (
             <div className="absolute bottom-4 right-4 flex space-x-2 z-20">
               {[1, 2, 3, 4].map((num) => {
@@ -289,19 +281,28 @@ export default function Home() {
         </div>
 
         <div className="bg-gray-800 border-t border-gray-700 pt-5 pb-4 px-2 flex flex-col space-y-3">
-          <div className="flex items-center space-x-3">
-            <select className="bg-gray-100 text-gray-900 text-base px-3 py-2 rounded-md flex-1" value={telco} onChange={e => setTelco(e.target.value)}>
-              <option value="">통신사 선택</option>
+          {/* 요구사항 1: 모드 토글 + 선택창 배열 */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleModeToggle}
+              className={`w-16 h-[42px] shrink-0 rounded-md font-bold text-xs transition-all duration-200 active:scale-95 shadow-md ${
+                mode === "MAP" ? "bg-blue-600 text-white" : "bg-orange-600 text-white"
+              }`}
+            >
+              {mode}
+            </button>
+            <select className="bg-gray-100 text-gray-900 text-base px-2 py-2 rounded-md flex-1 min-w-0" value={telco} onChange={e => setTelco(e.target.value)}>
+              <option value="">통신사</option>
               {telcoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
-            <select className="bg-gray-100 text-gray-900 text-base px-3 py-2 rounded-md flex-1" value={target} onChange={e => setTarget(e.target.value)}>
-              <option value="">서비스 타겟 선택</option>
+            <select className="bg-gray-100 text-gray-900 text-base px-2 py-2 rounded-md flex-1 min-w-0" value={target} onChange={e => setTarget(e.target.value)}>
+              <option value="">타겟</option>
               {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
 
           {target === "기타" && (
-            <input type="text" className="bg-gray-100 text-gray-900 text-base px-3 py-2 rounded-md" value={customTarget} onChange={e => setCustomTarget(e.target.value)} placeholder="서비스 타겟을 직접 입력하세요" />
+            <input type="text" className="bg-gray-100 text-gray-900 text-base px-3 py-2 rounded-md" value={customTarget} onChange={e => setCustomTarget(e.target.value)} placeholder="서비스 타겟 직접 입력" />
           )}
 
           <div className="flex items-stretch space-x-2">
