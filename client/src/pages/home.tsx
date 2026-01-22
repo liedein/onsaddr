@@ -41,7 +41,6 @@ export default function Home() {
   const [toast, setToast] = useState<ToastData | null>(null);
   const { isSupported, canInstall, promptToInstall } = useAddToHomeScreen();
 
-  // --- ANT 모드 관련 상태 ---
   const [mode, setMode] = useState<"MAP" | "ANT">("MAP");
   const [selectedAnt, setSelectedAnt] = useState<number | null>(null);
   const [antData, setAntData] = useState<Record<number, AntInfo | null>>({ 1: null, 2: null, 3: null, 4: null });
@@ -101,9 +100,7 @@ export default function Home() {
   };
 
   const handleLocationSelect = async (location: LocationData) => {
-    // ANT 모드에서는 위치 선택 로직 실행 안함 (안전장치)
     if (mode === "ANT") return;
-    
     if (usageCount >= USAGE_LIMIT) {
       showToast("오늘 조회 한도(100회)에 도달했습니다.", "error");
       return;
@@ -163,30 +160,40 @@ export default function Home() {
     }));
   };
 
+  // --- 클립보드 복사 로직 (통합형) ---
   const handleCopyToClipboard = async () => {
-    if (mode === "ANT") {
-      if (!selectedAnt || !antData[selectedAnt]) {
-        showToast("선택된 ANT의 각도가 없습니다.", "error");
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(`ANT${selectedAnt}: ${antData[selectedAnt]!.angle}`);
-        showToast("ANT 각도가 복사되었습니다!", "success");
-      } catch { showToast("복사에 실패했습니다.", "error"); }
-      return;
-    }
-
     const finalTarget = target === "기타" ? customTarget : target;
+
     if (!selectedLocation || !selectedLocation.address || !telco || !finalTarget) {
       showToast("모든 값을 선택해주세요.", "error");
       return;
     }
 
-    const copyText = `통신사: ${telco}\n서비스 타겟: ${finalTarget}\n위도: ${selectedLocation.lat.toFixed(6)}\n경도: ${selectedLocation.lng.toFixed(6)}\n지번주소: ${selectedLocation.address}\n상세위치: ${subAddress}\n세부내역: ${detail}`;
+    // 1. 기존 기본 정보 텍스트 생성
+    let copyText = 
+      `통신사: ${telco}\n` +
+      `서비스 타겟: ${finalTarget}\n` +
+      `위도: ${selectedLocation.lat.toFixed(6)}\n` +
+      `경도: ${selectedLocation.lng.toFixed(6)}\n` +
+      `지번주소: ${selectedLocation.address}\n` +
+      `상세위치: ${subAddress}\n` +
+      `세부내역: ${detail}`;
+
+    // 2. ANT 데이터가 있는 경우에만 추가
+    const antEntries = Object.entries(antData)
+      .filter(([_, data]) => data !== null)
+      .map(([key, data]) => `ANT${key}: ${data!.angle}`);
+
+    if (antEntries.length > 0) {
+      copyText += `\n${antEntries.join("\n")}`;
+    }
+
     try {
       await navigator.clipboard.writeText(copyText);
       showToast("클립보드에 복사되었습니다!", "success");
-    } catch { showToast("복사에 실패했습니다.", "error"); }
+    } catch (error) {
+      showToast("복사에 실패했습니다.", "error");
+    }
   };
 
   const handleRefresh = () => window.location.reload();
@@ -213,9 +220,7 @@ export default function Home() {
               </button>
             )}
           </div>
-
           <h1 className="text-xl font-bold text-gray-50 flex-grow text-center tracking-wide">내 주변 주소 조회</h1>
-
           <div className="w-12 flex justify-end">
             <button onClick={handleRefresh} className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors">
               <RefreshCw className="w-6 h-6" />
@@ -225,20 +230,8 @@ export default function Home() {
       </header>
 
       <main className="flex-1 flex flex-col relative">
-        <div 
-          ref={mapContainerRef}
-          className="relative overflow-hidden" 
-          style={{ height: "38vh", minHeight: "270px" }}
-          onClick={handleMapAreaClick}
-        >
-          <KakaoMap
-            ref={mapCompRef}
-            initialLocation={currentLocation}
-            selectedLocation={selectedLocation}
-            onLocationSelect={handleLocationSelect}
-            isLoading={isLoading || isLoadingLocation}
-            mode={mode} // 요구사항 2 반영을 위해 모드 전달
-          />
+        <div ref={mapContainerRef} className="relative overflow-hidden" style={{ height: "38vh", minHeight: "270px" }} onClick={handleMapAreaClick}>
+          <KakaoMap ref={mapCompRef} initialLocation={currentLocation} selectedLocation={selectedLocation} onLocationSelect={handleLocationSelect} isLoading={isLoading || isLoadingLocation} mode={mode} />
           
           <svg className="absolute inset-0 pointer-events-none w-full h-full z-10">
             {Object.entries(antData).map(([key, data]) => {
@@ -281,7 +274,6 @@ export default function Home() {
         </div>
 
         <div className="bg-gray-800 border-t border-gray-700 pt-5 pb-4 px-2 flex flex-col space-y-3">
-          {/* 요구사항 1: 모드 토글 + 선택창 배열 */}
           <div className="flex items-center space-x-2">
             <button
               onClick={handleModeToggle}
@@ -296,7 +288,7 @@ export default function Home() {
               {telcoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
             <select className="bg-gray-100 text-gray-900 text-base px-2 py-2 rounded-md flex-1 min-w-0" value={target} onChange={e => setTarget(e.target.value)}>
-              <option value="">타겟</option>
+              <option value="">서비스 타겟</option>
               {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
@@ -318,7 +310,7 @@ export default function Home() {
             </div>
             <button
               onClick={handleCopyToClipboard}
-              disabled={mode === "MAP" && (!selectedLocation?.address || !telco || !(target === "기타" ? customTarget : target) || isLoading)}
+              disabled={!selectedLocation?.address || !telco || !(target === "기타" ? customTarget : target) || isLoading}
               className="flex flex-col items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-colors duration-200 w-[60px] h-full disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ fontSize: "1.15rem", minWidth: "54px", minHeight: "86px" }}
             >
@@ -332,7 +324,7 @@ export default function Home() {
 
           <div className="flex items-center mb-1">
             <label className="text-sm text-gray-300 w-16 shrink-0">지번주소</label>
-            <input className="text-base bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1" value={selectedLocation?.address || ""} readOnly placeholder="위치를 선택해주세요" />
+            <input className="text-base bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1" value={selectedLocation?.address || ""} readOnly />
           </div>
 
           <div className="flex items-center mb-1">

@@ -6,7 +6,7 @@ interface KakaoMapProps {
   selectedLocation?: LocationData | null;
   onLocationSelect?: (location: LocationData) => void;
   isLoading?: boolean;
-  mode: "MAP" | "ANT"; // 모드 prop 추가
+  mode: "MAP" | "ANT";
 }
 
 declare global {
@@ -19,13 +19,13 @@ const KakaoMap = memo(forwardRef(function KakaoMap({
   initialLocation,
   selectedLocation,
   onLocationSelect,
-  mode, // 모드 수신
+  mode,
 }: KakaoMapProps, ref) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markerInstance = useRef<any>(null);
 
-  // 현재 모드를 참조하기 위한 ref (이벤트 리스너 내부용)
+  // 이벤트 핸들러에서 최신 모드 상태를 참조하기 위한 ref
   const modeRef = useRef(mode);
   useEffect(() => {
     modeRef.current = mode;
@@ -62,7 +62,7 @@ const KakaoMap = memo(forwardRef(function KakaoMap({
       markerInstance.current.setMap(mapInstance.current);
 
       window.kakao.maps.event.addListener(mapInstance.current, "click", (mouseEvent: any) => {
-        // 요구사항 2: MAP 모드일 때만 위치 변경 실행
+        // MAP 모드일 때만 핀 위치를 이동시킨다.
         if (modeRef.current === "MAP" && onLocationSelect) {
           const latlng = mouseEvent.latLng;
           onLocationSelect({ lat: latlng.getLat(), lng: latlng.getLng() });
