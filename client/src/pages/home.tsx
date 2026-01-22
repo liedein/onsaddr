@@ -1,5 +1,5 @@
 import { useAddToHomeScreen } from "@/hooks/useAddToHomeScreen";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import KakaoMap from "@/components/KakaoMap";
 import ToastNotification from "@/components/ToastNotification";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -20,31 +20,44 @@ export interface ToastData {
   isVisible: boolean;
 }
 
+interface AntInfo {
+  angle: number;
+  points: {
+    sx: number; sy: number;
+    ex: number; ey: number;
+    ax1: number; ay1: number;
+    ax2: number; ay2: number;
+  };
+}
+
 export default function Home() {
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [telco, setTelco] = useState("");
   const [target, setTarget] = useState("");
   const [customTarget, setCustomTarget] = useState("");
-  const [subAddress, setSubAddress] = useState(""); // 상세위치 수기 입력 상태
+  const [subAddress, setSubAddress] = useState("");
   const [detail, setDetail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
   const { isSupported, canInstall, promptToInstall } = useAddToHomeScreen();
 
-  // --- [추가] 기기 기반 사용량 상태 ---
+  // --- ANT 모드 관련 상태 ---
+  const [mode, setMode] = useState<"MAP" | "ANT">("MAP");
+  const [selectedAnt, setSelectedAnt] = useState<number | null>(null);
+  const [antData, setAntData] = useState<Record<number, AntInfo | null>>({ 1: null, 2: null, 3: null, 4: null });
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapCompRef = useRef<{ isMarkerAtCenter: () => boolean }>(null);
+
   const [usageCount, setUsageCount] = useState(0);
   const USAGE_LIMIT = 100;
 
-  // 페이지 로드 시 오늘 날짜의 사용량 확인
   useEffect(() => {
     const today = new Date().toLocaleDateString();
     const savedData = localStorage.getItem("map_usage");
-
     if (savedData) {
       const { date, count } = JSON.parse(savedData);
-      if (date === today) {
-        setUsageCount(count);
-      } else {
+      if (date === today) setUsageCount(count);
+      else {
         localStorage.setItem("map_usage", JSON.stringify({ date: today, count: 0 }));
         setUsageCount(0);
       }
@@ -53,7 +66,6 @@ export default function Home() {
     }
   }, []);
 
-  // 사용량 카운트 증가 함수
   const incrementUsage = () => {
     const today = new Date().toLocaleDateString();
     setUsageCount((prev) => {
@@ -76,19 +88,27 @@ export default function Home() {
     setTimeout(() => setToast(null), 2000);
   };
 
-  // --- [개선] 위치 선택 핸들러 (반응 속도 최적화) ---
+  const handleModeToggle = () => {
+    if (mode === "MAP") {
+      // 요구사항 12: 모드 전환 전 Pin 중심 확인
+      if (!mapCompRef.current?.isMarkerAtCenter()) {
+        showToast("Pin이 지도 중심에 있지 않습니다. 핀을 중앙에 놓아주세요.", "error");
+        return;
+      }
+      setMode("ANT");
+    } else {
+      setMode("MAP");
+    }
+  };
+
   const handleLocationSelect = async (location: LocationData) => {
+    if (mode === "ANT") return; // ANT 모드에선 위치 선택 막음
     if (usageCount >= USAGE_LIMIT) {
       showToast("오늘 조회 한도(100회)에 도달했습니다.", "error");
       return;
     }
 
-    // 1. 위경도 좌표를 먼저 즉시 반영 (딜레이 체감 감소)
-    setSelectedLocation({
-      lat: location.lat,
-      lng: location.lng,
-      address: "주소를 불러오는 중...",
-    });
+    setSelectedLocation({ lat: location.lat, lng: location.lng, address: "주소를 불러오는 중..." });
 
     try {
       setIsLoading(true);
@@ -97,21 +117,11 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lat: location.lat, lng: location.lng }),
       });
-
       if (!response.ok) throw new Error("주소 변환 실패");
-
       const data = await response.json();
-
-      // 2. 서버 응답 후 주소만 업데이트
-      setSelectedLocation({
-        lat: location.lat,
-        lng: location.lng,
-        address: data.address,
-      });
-
-      incrementUsage(); // 카운트 증가
+      setSelectedLocation({ lat: location.lat, lng: location.lng, address: data.address });
+      incrementUsage();
     } catch (error) {
-      console.error("주소 변환 오류:", error);
       showToast("주소를 가져오는데 실패했습니다.", "error");
       setSelectedLocation(prev => prev ? { ...prev, address: "" } : null);
     } finally {
@@ -119,81 +129,160 @@ export default function Home() {
     }
   };
 
-  const handleCopyToClipboard = async () => {
-    const finalTarget = target === "기타" ? customTarget : target;
+  const handleMapAreaClick = (e: React.MouseEvent) => {
+    if (mode !== "ANT" || !selectedAnt || !mapContainerRef.current) return;
 
+    const rect = mapContainerRef.current.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+
+    const angleRad = Math.atan2(py - cy, px - cx);
+    let deg = Math.round(angleRad * (180 / Math.PI) + 90);
+    if (deg < 0) deg += 360;
+    if (deg >= 360) deg -= 360;
+
+    const offset = 25;
+    const length = 100;
+    const sx = cx + Math.cos(angleRad) * offset;
+    const sy = cy + Math.sin(angleRad) * offset;
+    const ex = cx + Math.cos(angleRad) * length;
+    const ey = cy + Math.sin(angleRad) * length;
+
+    const headLen = 12;
+    const ax1 = ex - headLen * Math.cos(angleRad - Math.PI / 6);
+    const ay1 = ey - headLen * Math.sin(angleRad - Math.PI / 6);
+    const ax2 = ex - headLen * Math.cos(angleRad + Math.PI / 6);
+    const ay2 = ey - headLen * Math.sin(angleRad + Math.PI / 6);
+
+    setAntData(prev => ({
+      ...prev,
+      [selectedAnt]: { angle: deg, points: { sx, sy, ex, ey, ax1, ay1, ax2, ay2 } }
+    }));
+  };
+
+  const handleCopyToClipboard = async () => {
+    if (mode === "ANT") {
+      if (!selectedAnt || !antData[selectedAnt]) {
+        showToast("선택된 ANT의 각도가 없습니다.", "error");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(`ANT${selectedAnt}: ${antData[selectedAnt]!.angle}`);
+        showToast("ANT 각도가 복사되었습니다!", "success");
+      } catch { showToast("복사에 실패했습니다.", "error"); }
+      return;
+    }
+
+    const finalTarget = target === "기타" ? customTarget : target;
     if (!selectedLocation || !selectedLocation.address || !telco || !finalTarget) {
       showToast("모든 값을 선택해주세요.", "error");
       return;
     }
 
-    const copyText =
-      `통신사: ${telco}\n` +
-      `서비스 타겟: ${finalTarget}\n` +
-      `위도: ${selectedLocation.lat.toFixed(6)}\n` +
-      `경도: ${selectedLocation.lng.toFixed(6)}\n` +
-      `지번주소: ${selectedLocation.address}\n` +
-      `상세위치: ${subAddress}\n` +
-      `세부내역: ${detail}`;
-
+    const copyText = `통신사: ${telco}\n서비스 타겟: ${finalTarget}\n위도: ${selectedLocation.lat.toFixed(6)}\n경도: ${selectedLocation.lng.toFixed(6)}\n지번주소: ${selectedLocation.address}\n상세위치: ${subAddress}\n세부내역: ${detail}`;
     try {
       await navigator.clipboard.writeText(copyText);
       showToast("클립보드에 복사되었습니다!", "success");
-    } catch (error) {
-      showToast("복사에 실패했습니다.", "error");
-    }
+    } catch { showToast("복사에 실패했습니다.", "error"); }
   };
 
   const handleRefresh = () => window.location.reload();
+
+  const antColors = {
+    1: { name: 'rose', hex: "#f43f5e", bg: 'bg-rose-500', active: 'bg-rose-700' },
+    2: { name: 'emerald', hex: "#10b981", bg: 'bg-emerald-500', active: 'bg-emerald-700' },
+    3: { name: 'sky', hex: "#0ea5e9", bg: 'bg-sky-500', active: 'bg-sky-700' },
+    4: { name: 'violet', hex: "#8b5cf6", bg: 'bg-violet-500', active: 'bg-violet-700' },
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-50 flex flex-col">
       <header className="bg-gray-800 shadow-lg border-b border-gray-700">
         <div className="flex w-full items-center px-4 py-4">
-          <div className="w-12 flex items-center">
+          <div className="w-1/5 flex items-center space-x-2">
+            <button
+              onClick={handleModeToggle}
+              className={`px-3 py-1.5 rounded-md font-bold text-sm transition-all duration-200 active:scale-95 shadow-md ${
+                mode === "MAP" ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-orange-600 hover:bg-orange-700 text-white"
+              }`}
+            >
+              {mode}
+            </button>
             {isSupported && canInstall && (
               <button
                 type="button"
                 onClick={promptToInstall}
                 className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95"
-                aria-label="홈 화면에 추가"
-                title="홈 화면에 추가"
               >
-                <img 
-                  src="/icons/mapaddr_32.png" 
-                  alt="홈 화면에 추가" 
-                  className="w-6 h-6"
-                />
+                <img src="/icons/mapaddr_32.png" alt="install" className="w-6 h-6" />
               </button>
             )}
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-50 flex-grow text-center tracking-wide">
-            내 주변 주소 조회
-          </h1>
+          <h1 className="text-xl font-bold text-gray-50 flex-grow text-center tracking-wide">내 주변 주소 조회</h1>
 
           <div className="w-12 flex justify-end">
-            <button 
-              onClick={handleRefresh} 
-              className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
-            >
+            <button onClick={handleRefresh} className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors">
               <RefreshCw className="w-6 h-6" />
             </button>
           </div>
         </div>
       </header>
 
-
       <main className="flex-1 flex flex-col relative">
-        <div className="relative" style={{ height: "38vh", minHeight: "270px" }}>
+        <div 
+          ref={mapContainerRef}
+          className="relative overflow-hidden" 
+          style={{ height: "38vh", minHeight: "270px" }}
+          onClick={handleMapAreaClick}
+        >
           <KakaoMap
+            ref={mapCompRef}
             initialLocation={currentLocation}
             selectedLocation={selectedLocation}
             onLocationSelect={handleLocationSelect}
             isLoading={isLoading || isLoadingLocation}
           />
-          {selectedLocation?.address && (
-            <div className="absolute bottom-4 left-4 bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-lg px-3 py-2 max-w-xs shadow-lg">
+          
+          {/* 화살표 SVG 레이어 */}
+          <svg className="absolute inset-0 pointer-events-none w-full h-full z-10">
+            {Object.entries(antData).map(([key, data]) => {
+              if (!data) return null;
+              const color = antColors[Number(key) as keyof typeof antColors].hex;
+              return (
+                <g key={key}>
+                  <line x1={data.points.sx} y1={data.points.sy} x2={data.points.ex} y2={data.points.ey} stroke={color} strokeWidth="3" strokeLinecap="round" />
+                  <polygon points={`${data.points.ex},${data.points.ey} ${data.points.ax1},${data.points.ay1} ${data.points.ax2},${data.points.ay2}`} fill={color} />
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* ANT 모드 버튼 4개 */}
+          {mode === "ANT" && (
+            <div className="absolute bottom-4 right-4 flex space-x-2 z-20">
+              {[1, 2, 3, 4].map((num) => {
+                const config = antColors[num as keyof typeof antColors];
+                const isSelected = selectedAnt === num;
+                return (
+                  <button
+                    key={num}
+                    onClick={(e) => { e.stopPropagation(); setSelectedAnt(num); }}
+                    className={`w-12 h-10 rounded shadow-lg text-white font-bold transition-all duration-200 active:scale-90 border-2 ${
+                      isSelected ? `${config.active} border-white scale-110` : `${config.bg} border-transparent opacity-80`
+                    }`}
+                  >
+                    {antData[num]?.angle ?? `A${num}`}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {selectedLocation?.address && mode === "MAP" && (
+            <div className="absolute bottom-4 left-4 bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-lg px-3 py-2 max-w-xs shadow-lg z-20">
               <p className="text-sm text-gray-100 font-medium">{selectedLocation.address}</p>
             </div>
           )}
@@ -219,16 +308,16 @@ export default function Home() {
             <div className="flex flex-col flex-1 space-y-2">
               <div className="flex items-center">
                 <label className="text-sm text-gray-300 w-16 shrink-0">위도</label>
-                <input className="text-base font-mono bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1 min-w-[15rem] w-60" value={selectedLocation ? selectedLocation.lat.toFixed(6) : ""} readOnly />
+                <input className="text-base font-mono bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1" value={selectedLocation ? selectedLocation.lat.toFixed(6) : ""} readOnly />
               </div>
               <div className="flex items-center">
                 <label className="text-sm text-gray-300 w-16 shrink-0">경도</label>
-                <input className="text-base font-mono bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1 min-w-[15rem] w-60" value={selectedLocation ? selectedLocation.lng.toFixed(6) : ""} readOnly />
+                <input className="text-base font-mono bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1" value={selectedLocation ? selectedLocation.lng.toFixed(6) : ""} readOnly />
               </div>
             </div>
             <button
               onClick={handleCopyToClipboard}
-              disabled={!selectedLocation?.address || !telco || !(target === "기타" ? customTarget : target) || isLoading}
+              disabled={mode === "MAP" && (!selectedLocation?.address || !telco || !(target === "기타" ? customTarget : target) || isLoading)}
               className="flex flex-col items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-colors duration-200 w-[60px] h-full disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ fontSize: "1.15rem", minWidth: "54px", minHeight: "86px" }}
             >
