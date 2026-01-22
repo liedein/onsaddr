@@ -25,7 +25,6 @@ const KakaoMap = memo(forwardRef(function KakaoMap({
   const mapInstance = useRef<any>(null);
   const markerInstance = useRef<any>(null);
 
-  // 이벤트 핸들러에서 최신 모드 상태를 참조하기 위한 ref
   const modeRef = useRef(mode);
   useEffect(() => {
     modeRef.current = mode;
@@ -62,7 +61,6 @@ const KakaoMap = memo(forwardRef(function KakaoMap({
       markerInstance.current.setMap(mapInstance.current);
 
       window.kakao.maps.event.addListener(mapInstance.current, "click", (mouseEvent: any) => {
-        // MAP 모드일 때만 핀 위치를 이동시킨다.
         if (modeRef.current === "MAP" && onLocationSelect) {
           const latlng = mouseEvent.latLng;
           onLocationSelect({ lat: latlng.getLat(), lng: latlng.getLng() });

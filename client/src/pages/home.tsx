@@ -142,7 +142,7 @@ export default function Home() {
     if (deg >= 360) deg -= 360;
 
     const offset = 25;
-    const length = 100;
+    const length = 80; // 화살표 선 길이 수정 (100 -> 80)
     const sx = cx + Math.cos(angleRad) * offset;
     const sy = cy + Math.sin(angleRad) * offset;
     const ex = cx + Math.cos(angleRad) * length;
@@ -160,7 +160,6 @@ export default function Home() {
     }));
   };
 
-  // --- 클립보드 복사 로직 (통합형) ---
   const handleCopyToClipboard = async () => {
     const finalTarget = target === "기타" ? customTarget : target;
 
@@ -169,7 +168,6 @@ export default function Home() {
       return;
     }
 
-    // 1. 기존 기본 정보 텍스트 생성
     let copyText = 
       `통신사: ${telco}\n` +
       `서비스 타겟: ${finalTarget}\n` +
@@ -179,7 +177,6 @@ export default function Home() {
       `상세위치: ${subAddress}\n` +
       `세부내역: ${detail}`;
 
-    // 2. ANT 데이터가 있는 경우에만 추가
     const antEntries = Object.entries(antData)
       .filter(([_, data]) => data !== null)
       .map(([key, data]) => `ANT${key}: ${data!.angle}`);
@@ -251,13 +248,23 @@ export default function Home() {
               {[1, 2, 3, 4].map((num) => {
                 const config = antColors[num as keyof typeof antColors];
                 const isSelected = selectedAnt === num;
+                const hasValue = antData[num] !== null;
+                
+                // 버튼 스타일 조건부 설정
+                let buttonStyle = "";
+                if (isSelected) {
+                  buttonStyle = `${config.active} border-white scale-110 shadow-xl z-30 opacity-100`;
+                } else if (hasValue) {
+                  buttonStyle = `${config.bg} border-transparent opacity-100 shadow-md`;
+                } else {
+                  buttonStyle = `${config.bg} border-transparent opacity-40`;
+                }
+
                 return (
                   <button
                     key={num}
                     onClick={(e) => { e.stopPropagation(); setSelectedAnt(num); }}
-                    className={`w-12 h-10 rounded shadow-lg text-white font-bold transition-all duration-200 active:scale-90 border-2 ${
-                      isSelected ? `${config.active} border-white scale-110` : `${config.bg} border-transparent opacity-80`
-                    }`}
+                    className={`w-12 h-10 rounded text-white font-bold transition-all duration-200 active:scale-90 border-2 ${buttonStyle}`}
                   >
                     {antData[num]?.angle ?? `A${num}`}
                   </button>
@@ -288,7 +295,7 @@ export default function Home() {
               {telcoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
             <select className="bg-gray-100 text-gray-900 text-base px-2 py-2 rounded-md flex-1 min-w-0" value={target} onChange={e => setTarget(e.target.value)}>
-              <option value="">서비스 타겟</option>
+              <option value="">타겟</option>
               {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
