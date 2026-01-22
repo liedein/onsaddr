@@ -142,7 +142,7 @@ export default function Home() {
     if (deg >= 360) deg -= 360;
 
     const offset = 25;
-    const length = 80; // 화살표 선 길이 수정 (100 -> 80)
+    const length = 80;
     const sx = cx + Math.cos(angleRad) * offset;
     const sy = cy + Math.sin(angleRad) * offset;
     const ex = cx + Math.cos(angleRad) * length;
@@ -217,7 +217,7 @@ export default function Home() {
               </button>
             )}
           </div>
-          <h1 className="text-xl font-bold text-gray-50 flex-grow text-center tracking-wide">내 주변 주소 조회</h1>
+          <h1 className="text-2xl font-bold text-gray-50 flex-grow text-center tracking-wide">내 주변 주소 조회</h1>
           <div className="w-12 flex justify-end">
             <button onClick={handleRefresh} className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors">
               <RefreshCw className="w-6 h-6" />
@@ -250,14 +250,14 @@ export default function Home() {
                 const isSelected = selectedAnt === num;
                 const hasValue = antData[num] !== null;
                 
-                // 버튼 스타일 조건부 설정
                 let buttonStyle = "";
                 if (isSelected) {
                   buttonStyle = `${config.active} border-white scale-110 shadow-xl z-30 opacity-100`;
                 } else if (hasValue) {
                   buttonStyle = `${config.bg} border-transparent opacity-100 shadow-md`;
                 } else {
-                  buttonStyle = `${config.bg} border-transparent opacity-40`;
+                  // 수정: 초기 상태 시인성을 위해 opacity-40 -> 70으로 상향
+                  buttonStyle = `${config.bg} border-transparent opacity-70`;
                 }
 
                 return (
@@ -272,19 +272,15 @@ export default function Home() {
               })}
             </div>
           )}
-
-          {selectedLocation?.address && mode === "MAP" && (
-            <div className="absolute bottom-4 left-4 bg-gray-800/90 backdrop-blur-sm border border-gray-700 rounded-lg px-3 py-2 max-w-xs shadow-lg z-20">
-              <p className="text-sm text-gray-100 font-medium">{selectedLocation.address}</p>
-            </div>
-          )}
+          {/* 지도 위 주소 박스(selectedLocation?.address) 영역 삭제됨 */}
         </div>
 
         <div className="bg-gray-800 border-t border-gray-700 pt-5 pb-4 px-2 flex flex-col space-y-3">
           <div className="flex items-center space-x-2">
             <button
               onClick={handleModeToggle}
-              className={`w-16 h-[42px] shrink-0 rounded-md font-bold text-xs transition-all duration-200 active:scale-95 shadow-md ${
+              // 수정: 글자 크기 text-xs -> text-sm으로 상향
+              className={`w-16 h-[42px] shrink-0 rounded-md font-bold text-sm transition-all duration-200 active:scale-95 shadow-md ${
                 mode === "MAP" ? "bg-blue-600 text-white" : "bg-orange-600 text-white"
               }`}
             >
@@ -295,7 +291,8 @@ export default function Home() {
               {telcoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
             <select className="bg-gray-100 text-gray-900 text-base px-2 py-2 rounded-md flex-1 min-w-0" value={target} onChange={e => setTarget(e.target.value)}>
-              <option value="">타겟</option>
+              {/* 수정: '타겟' -> '서비스 타겟'으로 변경 */}
+              <option value="">서비스 타겟</option>
               {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
