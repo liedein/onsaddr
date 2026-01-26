@@ -26,8 +26,17 @@ const KakaoMap = memo(forwardRef(function KakaoMap({
   const markerInstance = useRef<any>(null);
 
   const modeRef = useRef(mode);
+  
+  // 모드 변경 시 Ref 업데이트 및 지도 조작 제한/허용
   useEffect(() => {
     modeRef.current = mode;
+    
+    if (mapInstance.current) {
+      const isAntMode = mode === "ANT";
+      // ANT 모드일 때 드래그와 휠 확대/축소 비활성화
+      mapInstance.current.setDraggable(!isAntMode);
+      mapInstance.current.setZoomable(!isAntMode);
+    }
   }, [mode]);
 
   useImperativeHandle(ref, () => ({
@@ -59,6 +68,11 @@ const KakaoMap = memo(forwardRef(function KakaoMap({
         position: mapInstance.current.getCenter(),
       });
       markerInstance.current.setMap(mapInstance.current);
+
+      // 초기 로드 시 현재 모드에 맞춰 드래그/줌 설정
+      const isAntMode = modeRef.current === "ANT";
+      mapInstance.current.setDraggable(!isAntMode);
+      mapInstance.current.setZoomable(!isAntMode);
 
       window.kakao.maps.event.addListener(mapInstance.current, "click", (mouseEvent: any) => {
         if (modeRef.current === "MAP" && onLocationSelect) {

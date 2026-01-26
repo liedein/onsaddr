@@ -6,6 +6,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { RefreshCw } from "lucide-react";
 
 const telcoOptions = ["KT", "LGU", "KT+LGU"];
+const generationOptions = ["5G", "LTE"]; // 세대 옵션 목록 추가
 const targetOptions = ["도로", "교차로", "건물", "철도", "등산로", "해상로", "기타"];
 
 export interface LocationData {
@@ -33,6 +34,7 @@ interface AntInfo {
 export default function Home() {
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [telco, setTelco] = useState("");
+  const [generation, setGeneration] = useState(""); // 세대 상태 추가
   const [target, setTarget] = useState("");
   const [customTarget, setCustomTarget] = useState("");
   const [subAddress, setSubAddress] = useState("");
@@ -163,13 +165,15 @@ export default function Home() {
   const handleCopyToClipboard = async () => {
     const finalTarget = target === "기타" ? customTarget : target;
 
-    if (!selectedLocation || !selectedLocation.address || !telco || !finalTarget) {
+    // 세대(generation) 선택 여부 체크 추가
+    if (!selectedLocation || !selectedLocation.address || !telco || !generation || !finalTarget) {
       showToast("모든 값을 선택해주세요.", "error");
       return;
     }
 
     let copyText = 
       `통신사: ${telco}\n` +
+      `세대: ${generation}\n` + // 클립보드 데이터에 세대 추가
       `서비스 타겟: ${finalTarget}\n` +
       `위도: ${selectedLocation.lat.toFixed(6)}\n` +
       `경도: ${selectedLocation.lng.toFixed(6)}\n` +
@@ -256,7 +260,6 @@ export default function Home() {
                 } else if (hasValue) {
                   buttonStyle = `${config.bg} border-transparent opacity-100 shadow-md`;
                 } else {
-                  // 수정: 초기 상태 시인성을 위해 opacity-40 -> 70으로 상향
                   buttonStyle = `${config.bg} border-transparent opacity-70`;
                 }
 
@@ -272,83 +275,21 @@ export default function Home() {
               })}
             </div>
           )}
-          {/* 지도 위 주소 박스(selectedLocation?.address) 영역 삭제됨 */}
         </div>
 
         <div className="bg-gray-800 border-t border-gray-700 pt-5 pb-4 px-2 flex flex-col space-y-3">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1"> {/* 간격 조정을 위해 space-x-2 -> space-x-1 */}
             <button
               onClick={handleModeToggle}
-              // 수정: 글자 크기 text-xs -> text-sm으로 상향
               className={`w-16 h-[42px] shrink-0 rounded-md font-bold text-sm transition-all duration-200 active:scale-95 shadow-md ${
                 mode === "MAP" ? "bg-blue-600 text-white" : "bg-orange-600 text-white"
               }`}
             >
               {mode}
             </button>
-            <select className="bg-gray-100 text-gray-900 text-base px-2 py-2 rounded-md flex-1 min-w-0" value={telco} onChange={e => setTelco(e.target.value)}>
+            <select className="bg-gray-100 text-gray-900 text-base px-1 py-2 rounded-md flex-1 min-w-0" value={telco} onChange={e => setTelco(e.target.value)}>
               <option value="">통신사</option>
               {telcoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
-            <select className="bg-gray-100 text-gray-900 text-base px-2 py-2 rounded-md flex-1 min-w-0" value={target} onChange={e => setTarget(e.target.value)}>
-              {/* 수정: '타겟' -> '서비스 타겟'으로 변경 */}
-              <option value="">서비스 타겟</option>
-              {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          </div>
-
-          {target === "기타" && (
-            <input type="text" className="bg-gray-100 text-gray-900 text-base px-3 py-2 rounded-md" value={customTarget} onChange={e => setCustomTarget(e.target.value)} placeholder="서비스 타겟 직접 입력" />
-          )}
-
-          <div className="flex items-stretch space-x-2">
-            <div className="flex flex-col flex-1 space-y-2">
-              <div className="flex items-center">
-                <label className="text-sm text-gray-300 w-16 shrink-0">위도</label>
-                <input className="text-base font-mono bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1" value={selectedLocation ? selectedLocation.lat.toFixed(6) : ""} readOnly />
-              </div>
-              <div className="flex items-center">
-                <label className="text-sm text-gray-300 w-16 shrink-0">경도</label>
-                <input className="text-base font-mono bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1" value={selectedLocation ? selectedLocation.lng.toFixed(6) : ""} readOnly />
-              </div>
-            </div>
-            <button
-              onClick={handleCopyToClipboard}
-              disabled={!selectedLocation?.address || !telco || !(target === "기타" ? customTarget : target) || isLoading}
-              className="flex flex-col items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-colors duration-200 w-[60px] h-full disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ fontSize: "1.15rem", minWidth: "54px", minHeight: "86px" }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2" stroke="currentColor" fill="none"/>
-                <rect x="3" y="3" width="13" height="13" rx="2" strokeWidth="2" stroke="currentColor" fill="none"/>
-              </svg>
-              복사
-            </button>
-          </div>
-
-          <div className="flex items-center mb-1">
-            <label className="text-sm text-gray-300 w-16 shrink-0">지번주소</label>
-            <input className="text-base bg-gray-700 px-3 py-2 rounded-md text-gray-100 flex-1" value={selectedLocation?.address || ""} readOnly />
-          </div>
-
-          <div className="flex items-center mb-1">
-            <label className="text-sm text-gray-300 w-16 shrink-0">상세위치</label>
-            <input className="text-base bg-gray-100 text-gray-900 px-3 py-2 rounded-md flex-1" value={subAddress} onChange={e => setSubAddress(e.target.value)} placeholder="건물명, 시설물 위치 등을 입력하세요" />
-          </div>
-
-          <div className="flex items-start">
-            <label className="text-sm text-gray-300 w-16 shrink-0 mt-2">세부내역</label>
-            <textarea maxLength={100} rows={2} className="text-base bg-gray-100 text-gray-900 px-3 py-2 rounded-md flex-1 resize-none" value={detail} onChange={e => setDetail(e.target.value)} placeholder="100자 이내로 세부내역을 입력해주세요" style={{ minHeight: "3.2em", maxHeight: "4em" }} />
-          </div>
-
-          <div className="mt-3 text-center pb-0 border-t border-gray-700 pt-3">
-            <span className="text-sm text-gray-300">금일 조회 횟수: </span>
-            <span className="text-sm text-emerald-400 font-medium">{usageCount}</span>
-            <span className="text-sm text-gray-300"> / {USAGE_LIMIT}</span>
-          </div>
-        </div>
-      </main>
-      <ToastNotification toast={toast} />
-    </div>
-  );
-}
+            {/* 세대 드롭다운 추가 */}
+            <select className="bg-gray-100 text-
