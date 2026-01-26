@@ -286,15 +286,15 @@ export default function Home() {
             >
               {mode}
             </button>
-            <select className="bg-gray-100 text-gray-900 text-base px-1 py-2 rounded-md flex-1 min-w-0" value={telco} onChange={e => setTelco(e.target.value)}>
+            <select className="bg-gray-100 text-gray-900 text-base px-1 py-2 rounded-md flex-[0.8] min-w-0" value={telco} onChange={e => setTelco(e.target.value)}>
               <option value="">통신사</option>
               {telcoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
-            <select className="bg-gray-100 text-gray-900 text-base px-1 py-2 rounded-md flex-1 min-w-0" value={generation} onChange={e => setGeneration(e.target.value)}>
+            <select className="bg-gray-100 text-gray-900 text-base px-1 py-2 rounded-md flex-[0.8] min-w-0" value={generation} onChange={e => setGeneration(e.target.value)}>
               <option value="">세대</option>
               {generationOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
-            <select className="bg-gray-100 text-gray-900 text-base px-1 py-2 rounded-md flex-1 min-w-0" value={target} onChange={e => setTarget(e.target.value)}>
+            <select className="bg-gray-100 text-gray-900 text-base px-1 py-2 rounded-md flex-[1.4] min-w-0" value={target} onChange={e => setTarget(e.target.value)}>
               <option value="">서비스 타겟</option>
               {targetOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
