@@ -165,7 +165,7 @@ export default function Home() {
   const handleCopyToClipboard = async () => {
     const finalTarget = target === "기타" ? customTarget : target;
 
-    if (!selectedLocation || !selectedLocation.address || !telco || !generation || !finalTarget) {
+    if (!selectedLocation || !selectedLocation.address || !telco || !generation || !finalTarget || !subAddress) {
       showToast("모든 값을 선택해주세요.", "error");
       return;
     }
@@ -317,7 +317,7 @@ export default function Home() {
             </div>
             <button
               onClick={handleCopyToClipboard}
-              disabled={!selectedLocation?.address || !telco || !generation || !(target === "기타" ? customTarget : target) || isLoading}
+              disabled={!selectedLocation?.address || !telco || !generation || !(target === "기타" ? customTarget : target) || !subAddress || isLoading}
               className="flex flex-col items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-colors duration-200 w-[60px] h-full disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ fontSize: "1.15rem", minWidth: "54px", minHeight: "86px" }}
             >
