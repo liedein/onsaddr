@@ -6,7 +6,7 @@ import { useGeolocation } from "@/hooks/useGeolocation";
 import { RefreshCw } from "lucide-react";
 
 const telcoOptions = ["KT", "LGU", "KT+LGU"];
-const generationOptions = ["5G", "LTE"]; // '세대' 옵션 추가
+const generationOptions = ["5G", "LTE", "5G+LTE"]; // '세대' 옵션 추가
 const targetOptions = ["도로", "교차로", "건물", "철도", "등산로", "해상로", "기타"];
 
 export interface LocationData {
