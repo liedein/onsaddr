@@ -1,20 +1,22 @@
 /**
  * 현행화 페이지
  * 라우트: /renew
- * - 지도 초기 level 1, MAP/ANT 좌하단, 지도 높이 확대
- * - 하단 패널: 위도, 경도, 지번주소, 상세위치, 세부내역만
- * - ANT 시 위치/방향 토글, A1~A4 위치·방향, bounds 자동 조정, 복사 로직
+ * - etc.tsx와 동일한 UX: 새로고침 버튼, A1~A4 우하단, Geolocation, 금일 조회 횟수
+ * - MAP/ANT 대신 "위치/방향" 토글로만 동작
  */
 import { useState, useRef, useEffect, useCallback } from "react";
 import KakaoMap from "@/components/KakaoMap";
 import type { KakaoMapRef } from "@/components/KakaoMap";
 import ToastNotification from "@/components/ToastNotification";
 import AppLayout from "@/components/AppLayout";
+import { useGeolocation } from "@/hooks/useGeolocation";
+import { RefreshCw } from "lucide-react";
 import type { LocationData, ToastData, AntInfo, SlotData } from "@/types/map";
 import { latToDMS, lngToDMS } from "@/lib/coordinates";
 import { copyToClipboard } from "@/lib/clipboard";
 
 const SLOT_KEYS = [1, 2, 3, 4] as const;
+/** etc.tsx와 동일한 A1~A4 색상 정의 */
 const antColors: Record<number, { hex: string; bg: string; active: string }> = {
   1: { hex: "#f43f5e", bg: "bg-rose-500", active: "bg-rose-700" },
   2: { hex: "#10b981", bg: "bg-emerald-500", active: "bg-emerald-700" },
@@ -22,7 +24,7 @@ const antColors: Record<number, { hex: string; bg: string; active: string }> = {
   4: { hex: "#8b5cf6", bg: "bg-violet-500", active: "bg-violet-700" },
 };
 
-/** 화살표 꼭지점 계산 (Etc와 동일 로직) */
+/** 화살표 꼭지점 계산 (etc handleMapAreaClick과 동일 로직) */
 function getArrowPoints(
   sx: number,
   sy: number,
@@ -41,7 +43,6 @@ function getArrowPoints(
 }
 
 export default function Renew() {
-  const [mode, setMode] = useState<"MAP" | "ANT">("MAP");
   const [locationDirectionMode, setLocationDirectionMode] = useState<"위치" | "방향">("위치");
   const [slots, setSlots] = useState<Record<number, SlotData | null>>({
     1: null,
@@ -62,13 +63,53 @@ export default function Renew() {
     4: null,
   });
 
+  const [usageCount, setUsageCount] = useState(0);
+  const USAGE_LIMIT = 100;
+
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapCompRef = useRef<KakaoMapRef | null>(null);
+
+  /** etc와 동일: 금일 조회 횟수 localStorage */
+  useEffect(() => {
+    const today = new Date().toLocaleDateString();
+    const savedData = localStorage.getItem("map_usage");
+    if (savedData) {
+      const { date, count } = JSON.parse(savedData);
+      if (date === today) setUsageCount(count);
+      else {
+        localStorage.setItem("map_usage", JSON.stringify({ date: today, count: 0 }));
+        setUsageCount(0);
+      }
+    } else {
+      localStorage.setItem("map_usage", JSON.stringify({ date: today, count: 0 }));
+    }
+  }, []);
+
+  const incrementUsage = () => {
+    const today = new Date().toLocaleDateString();
+    setUsageCount((prev) => {
+      const newCount = prev + 1;
+      localStorage.setItem("map_usage", JSON.stringify({ date: today, count: newCount }));
+      return newCount;
+    });
+  };
+
+  const { currentLocation, isLoadingLocation } = useGeolocation();
+
+  /** 초기 진입 시: Geolocation으로 현재 위치 → 지도 중심 (고정 좌표 사용 금지) */
+  useEffect(() => {
+    if (!panelLocation && !slots[1] && currentLocation) {
+      setPanelLocation(currentLocation);
+    }
+  }, [currentLocation]);
 
   const showToast = useCallback((message: string, type: "success" | "error") => {
     setToast({ message, type, isVisible: true });
     setTimeout(() => setToast(null), 2000);
   }, []);
+
+  /** etc와 동일: 새로고침 시 페이지 reload → Geolocation 재실행 */
+  const handleRefresh = () => window.location.reload();
 
   const fetchAddress = useCallback(
     async (lat: number, lng: number): Promise<{ address: string; roadAddress?: string; jibunAddress?: string }> => {
@@ -116,12 +157,18 @@ export default function Renew() {
     return { lat: s.lat, lng: s.lng, label: `A${num}` };
   }).filter(Boolean) as Array<{ lat: number; lng: number; label?: string }>;
 
+  /** 지도 중심/마커: 현재 위치 → A1 → 패널 순 (Geolocation 우선) */
   const selectedLocationForMap =
     panelLocation ?? (slots[1] ? { lat: slots[1].lat, lng: slots[1].lng, address: slots[1].address } : null);
 
+  /** 위치 모드 + A# 미선택 시 지도 클릭 → 패널 위치 설정 (etc의 handleLocationSelect와 동일 역할) */
   const handleLocationSelect = useCallback(
     async (location: LocationData) => {
-      if (mode !== "MAP") return;
+      if (locationDirectionMode !== "위치" || selectedAnt !== null) return;
+      if (usageCount >= USAGE_LIMIT) {
+        showToast("오늘 조회 한도(100회)에 도달했습니다.", "error");
+        return;
+      }
       setPanelLocation({ ...location, address: "주소를 불러오는 중..." });
       try {
         setIsLoading(true);
@@ -133,6 +180,7 @@ export default function Renew() {
           roadAddress: data.roadAddress,
           jibunAddress: data.jibunAddress,
         });
+        incrementUsage();
       } catch {
         showToast("주소를 가져오는데 실패했습니다.", "error");
         setPanelLocation((prev) => (prev ? { ...prev, address: "" } : null));
@@ -140,13 +188,11 @@ export default function Renew() {
         setIsLoading(false);
       }
     },
-    [mode, fetchAddress, showToast]
+    [locationDirectionMode, selectedAnt, usageCount, fetchAddress, showToast]
   );
 
   const handleMapClick = useCallback(
     async (lat: number, lng: number) => {
-      if (mode !== "ANT") return;
-
       if (locationDirectionMode === "위치" && selectedAnt !== null) {
         setSlots((prev) => {
           const next = { ...prev };
@@ -158,6 +204,10 @@ export default function Renew() {
           };
           return next;
         });
+        if (usageCount >= USAGE_LIMIT) {
+          showToast("오늘 조회 한도(100회)에 도달했습니다.", "error");
+          return;
+        }
         try {
           setIsLoading(true);
           const data = await fetchAddress(lat, lng);
@@ -182,6 +232,7 @@ export default function Renew() {
               jibunAddress: data.jibunAddress,
             });
           }
+          incrementUsage();
         } catch {
           showToast("주소를 가져오는데 실패했습니다.", "error");
         } finally {
@@ -227,25 +278,19 @@ export default function Renew() {
         setArrowPoints((prev) => ({ ...prev, [selectedAnt]: points }));
       }
     },
-    [
-      mode,
-      locationDirectionMode,
-      selectedAnt,
-      slots,
-      fetchAddress,
-      showToast,
-    ]
+    [locationDirectionMode, selectedAnt, slots, usageCount, fetchAddress, showToast]
   );
 
   const slotsWithPosition = SLOT_KEYS.filter((n) => slots[n]);
+  /** A1~A4 기반 중심/줌 자동 조정 유지. 실행 순서: 초기엔 Geolocation 중심 → 이후 슬롯 설정 시 bounds */
   useEffect(() => {
-    if (mode !== "ANT" || slotsWithPosition.length === 0) return;
+    if (slotsWithPosition.length === 0) return;
     const latLngs = slotsWithPosition.map((n) => ({
       lat: slots[n]!.lat,
       lng: slots[n]!.lng,
     }));
     mapCompRef.current?.setBounds(latLngs);
-  }, [mode, slots]);
+  }, [slots]);
 
   const handleCopyToClipboard = useCallback(async () => {
     const a1 = slots[1];
@@ -291,12 +336,22 @@ export default function Renew() {
     else showToast("복사에 실패했습니다.", "error");
   }, [slots, subAddress, showToast]);
 
-  const displayLocation = panelLocation ?? (slots[1] ? { lat: slots[1].lat, lng: slots[1].lng, address: slots[1].address } : null);
+  const displayLocation =
+    panelLocation ?? (slots[1] ? { lat: slots[1].lat, lng: slots[1].lng, address: slots[1].address } : null);
+
+  /** etc와 동일: 헤더 우측 새로고침 버튼 (JSX·아이콘·클래스·핸들러 이름·동작) */
+  const rightSlot = (
+    <button
+      onClick={handleRefresh}
+      className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
+    >
+      <RefreshCw className="w-6 h-6" />
+    </button>
+  );
 
   return (
-    <AppLayout title="현행화">
+    <AppLayout title="현행화" rightSlot={rightSlot}>
       <div className="flex-1 flex flex-col relative">
-        {/* 지도 영역: 높이를 헤더 높이만큼 더 크게 (기존 38vh → 약 45vh) */}
         <div
           ref={mapContainerRef}
           className="relative overflow-hidden"
@@ -305,88 +360,79 @@ export default function Renew() {
           <KakaoMap
             ref={mapCompRef}
             initialLevel={1}
-            showCenterMarker={false}
-            mode={mode}
+            showCenterMarker={true}
+            mode="MAP"
+            initialLocation={currentLocation}
             selectedLocation={selectedLocationForMap}
             onLocationSelect={handleLocationSelect}
             onMapClick={handleMapClick}
             onMapIdle={handleMapIdle}
             circlePositions={circlePositions}
-            isLoading={isLoading}
+            isLoading={isLoading || isLoadingLocation}
           />
 
-          {/* MAP/ANT 토글: 좌측 하단 */}
-          <div className="absolute bottom-4 left-4 z-20">
+          {/* MAP/ANT 제거 → 위치/방향 토글만 (기존 토글 위치) */}
+          <div className="absolute bottom-4 left-4 flex rounded-md overflow-hidden shadow-md bg-gray-800/90 z-20">
             <button
               type="button"
-              onClick={() => setMode((m) => (m === "MAP" ? "ANT" : "MAP"))}
-              className={`w-16 h-[42px] rounded-md font-bold text-sm shadow-md transition-all active:scale-95 ${
-                mode === "MAP" ? "bg-blue-600 text-white" : "bg-orange-600 text-white"
+              onClick={() => setLocationDirectionMode("위치")}
+              className={`w-16 h-[42px] shrink-0 font-bold text-sm transition-all duration-200 active:scale-95 ${
+                locationDirectionMode === "위치"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
               }`}
             >
-              {mode}
+              위치
+            </button>
+            <button
+              type="button"
+              onClick={() => setLocationDirectionMode("방향")}
+              className={`w-16 h-[42px] shrink-0 font-bold text-sm transition-all duration-200 active:scale-95 ${
+                locationDirectionMode === "방향"
+                  ? "bg-orange-600 text-white"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
+            >
+              방향
             </button>
           </div>
 
-          {/* ANT일 때 위치/방향 토글 + A1~A4 (지도 오른쪽 또는 인접 UI) */}
-          {mode === "ANT" && (
-            <div className="absolute top-4 right-4 bottom-4 flex flex-col gap-2 z-20 w-28">
-              <div className="flex rounded-md overflow-hidden shadow-lg bg-gray-800/90 p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setLocationDirectionMode("위치")}
-                  className={`flex-1 py-2 text-xs font-medium ${
-                    locationDirectionMode === "위치"
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  위치
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setLocationDirectionMode("방향")}
-                  className={`flex-1 py-2 text-xs font-medium ${
-                    locationDirectionMode === "방향"
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-300 hover:bg-gray-700"
-                  }`}
-                >
-                  방향
-                </button>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {SLOT_KEYS.map((num) => {
-                  const hasPosition = !!slots[num];
-                  const canSelectDirection =
-                    locationDirectionMode === "방향" && hasPosition;
-                  const canSelectPosition = locationDirectionMode === "위치";
-                  const isSelected = selectedAnt === num;
-                  const canSelect =
-                    locationDirectionMode === "위치" || canSelectDirection;
-                  const config = antColors[num];
-                  return (
-                    <button
-                      key={num}
-                      type="button"
-                      disabled={!canSelect}
-                      onClick={() => setSelectedAnt(isSelected ? null : num)}
-                      className={`w-full py-2 rounded text-white font-bold text-sm transition-all border-2 ${
-                        isSelected ? config.active : hasPosition ? config.bg : "bg-gray-600 opacity-70"
-                      } ${!canSelect ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      A{num}
-                      {slots[num]?.direction != null && (
-                        <span className="ml-1 text-xs">({slots[num]!.direction!.angle}°)</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {/* etc와 동일: A1~A4 지도 우하단, 가로 배열, 동일 스타일 */}
+          {/* etc와 동일: 지도 우하단, 가로 배열, 버튼 간격·색·크기·border·선택 스타일 동일 */}
+          <div className="absolute bottom-4 right-4 flex space-x-2 z-20">
+            {SLOT_KEYS.map((num) => {
+              const config = antColors[num];
+              const isSelected = selectedAnt === num;
+              const hasValue = slots[num] !== null;
+              const canSelectDirection = locationDirectionMode === "방향" ? hasValue : true;
 
-          {/* 방향 화살표 SVG 오버레이 */}
+              let buttonStyle = "";
+              if (isSelected) {
+                buttonStyle = `${config.active} border-white scale-110 shadow-xl z-30 opacity-100`;
+              } else if (hasValue) {
+                buttonStyle = `${config.bg} border-transparent opacity-100 shadow-md`;
+              } else {
+                buttonStyle = `${config.bg} border-transparent opacity-70`;
+              }
+
+              return (
+                <button
+                  key={num}
+                  type="button"
+                  disabled={!canSelectDirection}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!canSelectDirection) return;
+                    setSelectedAnt(isSelected ? null : num);
+                  }}
+                  className={`w-12 h-10 rounded text-white font-bold transition-all duration-200 active:scale-90 border-2 ${buttonStyle} ${!canSelectDirection ? "opacity-50 cursor-not-allowed" : ""}`}
+                >
+                  {slots[num]?.direction?.angle ?? `A${num}`}
+                </button>
+              );
+            })}
+          </div>
+
           <svg className="absolute inset-0 pointer-events-none w-full h-full z-10">
             {SLOT_KEYS.map((num) => {
               const pts = arrowPoints[num];
@@ -413,7 +459,6 @@ export default function Renew() {
           </svg>
         </div>
 
-        {/* 하단 정보 패널: 위도, 경도, 지번주소, 상세위치, 세부내역 + 복사 */}
         <div className="bg-gray-800 border-t border-gray-700 pt-5 pb-4 px-2 flex flex-col space-y-3">
           <div className="flex items-stretch space-x-2">
             <div className="flex flex-col flex-1 space-y-2">
@@ -438,7 +483,7 @@ export default function Renew() {
               type="button"
               onClick={handleCopyToClipboard}
               disabled={!slots[1]}
-              className="flex flex-col items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-colors w-[60px] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex flex-col items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md transition-colors duration-200 w-[60px] h-full disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ fontSize: "1.15rem", minWidth: "54px", minHeight: "86px" }}
             >
               <svg
@@ -485,6 +530,13 @@ export default function Renew() {
               placeholder="100자 이내"
               style={{ minHeight: "3.2em", maxHeight: "4em" }}
             />
+          </div>
+
+          {/* etc와 동일: 금일 조회 횟수 위치·스타일·로직 유지 */}
+          <div className="mt-3 text-center pb-0 border-t border-gray-700 pt-3">
+            <span className="text-sm text-gray-300">금일 조회 횟수: </span>
+            <span className="text-sm text-emerald-400 font-medium">{usageCount}</span>
+            <span className="text-sm text-gray-300"> / {USAGE_LIMIT}</span>
           </div>
         </div>
       </div>
