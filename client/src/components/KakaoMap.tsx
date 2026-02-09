@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo, forwardRef, useImperativeHandle } from "react";
+import { useEffect, useRef, memo, forwardRef, useImperativeHandle, useState } from "react";
 import type { LocationData } from "@/types/map";
 
 export interface CirclePosition {
@@ -59,6 +59,7 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
   const circleInstances = useRef<any[]>([]);
   const idleHandlerRef = useRef<(() => void) | null>(null);
   const modeRef = useRef(mode);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -143,6 +144,7 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
         idleHandlerRef.current = handler;
         window.kakao.maps.event.addListener(mapInstance.current, "idle", handler);
       }
+      setMapReady(true);
     });
 
     return () => {
@@ -167,9 +169,9 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
     mapInstance.current.setCenter(moveLatLon);
   }, [selectedLocation?.lat, selectedLocation?.lng, showCenterMarker]);
 
-  // 원형 마커 갱신
+  // 원형 마커 갱신 (지도 로드 완료 후 + circlePositions 변경 시)
   useEffect(() => {
-    if (!window.kakao || !mapInstance.current) return;
+    if (!window.kakao || !mapInstance.current || !mapReady) return;
 
     circleInstances.current.forEach((c) => c.setMap(null));
     circleInstances.current = [];
@@ -177,17 +179,17 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
     circlePositions.forEach((pos) => {
       const circle = new window.kakao.maps.Circle({
         center: new window.kakao.maps.LatLng(pos.lat, pos.lng),
-        radius: 15,
+        radius: 25,
         strokeWeight: 2,
         strokeColor: "#3b82f6",
         strokeOpacity: 1,
         fillColor: "#3b82f6",
-        fillOpacity: 0.6,
+        fillOpacity: 0.5,
       });
       circle.setMap(mapInstance.current);
       circleInstances.current.push(circle);
     });
-  }, [circlePositions]);
+  }, [circlePositions, mapReady]);
 
   return <div ref={mapRef} className="w-full h-full rounded-lg overflow-hidden" />;
 }));

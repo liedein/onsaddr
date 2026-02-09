@@ -62,6 +62,13 @@ export default function Renew() {
     3: null,
     4: null,
   });
+  /** 위치를 설정한 A1~A4의 픽셀 좌표 (지도 위 원형 포인트 그리기용) */
+  const [circlePixelPositions, setCirclePixelPositions] = useState<Record<number, { x: number; y: number } | null>>({
+    1: null,
+    2: null,
+    3: null,
+    4: null,
+  });
 
   const [usageCount, setUsageCount] = useState(0);
   const USAGE_LIMIT = 100;
@@ -129,18 +136,24 @@ export default function Renew() {
     []
   );
 
+  /** 화살표 픽셀 좌표 + 위치 설정된 A1~A4 원형 포인트 픽셀 좌표 갱신 (지도 이동/줌 시 호출) */
   const updateArrowPoints = useCallback(() => {
     const ref = mapCompRef.current;
     if (!ref) return;
-    const next: Record<number, AntInfo["points"] | null> = { 1: null, 2: null, 3: null, 4: null };
+    const nextArrow: Record<number, AntInfo["points"] | null> = { 1: null, 2: null, 3: null, 4: null };
+    const nextCircle: Record<number, { x: number; y: number } | null> = { 1: null, 2: null, 3: null, 4: null };
     SLOT_KEYS.forEach((num) => {
       const slot = slots[num];
-      if (!slot?.lat || !slot?.direction) return;
+      if (!slot || slot.lat == null || slot.lng == null) return;
       const pt = ref.getPointFromLatLng(slot.lat, slot.lng);
       if (!pt) return;
-      next[num] = getArrowPoints(pt.x, pt.y, slot.direction.angle);
+      nextCircle[num] = { x: pt.x, y: pt.y };
+      if (slot.direction) {
+        nextArrow[num] = getArrowPoints(pt.x, pt.y, slot.direction.angle);
+      }
     });
-    setArrowPoints(next);
+    setArrowPoints(nextArrow);
+    setCirclePixelPositions(nextCircle);
   }, [slots]);
 
   useEffect(() => {
@@ -254,7 +267,8 @@ export default function Renew() {
           } else {
             mapCompRef.current?.setCenter(lat, lng);
           }
-        }, 100);
+          updateArrowPoints();
+        }, 150);
         return;
       }
 
@@ -284,7 +298,7 @@ export default function Renew() {
         setArrowPoints((prev) => ({ ...prev, [selectedAnt]: points }));
       }
     },
-    [locationDirectionMode, selectedAnt, slots, usageCount, fetchAddress, showToast]
+    [locationDirectionMode, selectedAnt, slots, usageCount, fetchAddress, showToast, updateArrowPoints]
   );
 
   const slotsWithPosition = SLOT_KEYS.filter((n) => slots[n]);
@@ -445,13 +459,33 @@ export default function Renew() {
             })}
           </div>
 
+          {/* 위치 설정 시마다 원형 포인트 표시 (A1~A4) */}
           <svg className="absolute inset-0 pointer-events-none w-full h-full z-10">
+            {SLOT_KEYS.map((num) => {
+              const pos = circlePixelPositions[num];
+              if (!pos) return null;
+              const color = antColors[num].hex;
+              return (
+                <g key={`circle-${num}`}>
+                  <circle
+                    cx={pos.x}
+                    cy={pos.y}
+                    r={14}
+                    fill={color}
+                    fillOpacity={0.5}
+                    stroke={color}
+                    strokeWidth={2}
+                  />
+                </g>
+              );
+            })}
+            {/* 경쟁사 동향 페이지와 동일: 화살표 로직 */}
             {SLOT_KEYS.map((num) => {
               const pts = arrowPoints[num];
               if (!pts) return null;
               const color = antColors[num].hex;
               return (
-                <g key={num}>
+                <g key={`arrow-${num}`}>
                   <line
                     x1={pts.sx}
                     y1={pts.sy}
