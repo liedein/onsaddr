@@ -194,6 +194,7 @@ export default function Renew() {
   const handleMapClick = useCallback(
     async (lat: number, lng: number) => {
       if (locationDirectionMode === "위치" && selectedAnt !== null) {
+        // 위치 재지정 시 해당 A#의 방향은 함께 삭제 (A1~A4 동일 규칙)
         setSlots((prev) => {
           const next = { ...prev };
           next[selectedAnt] = {
@@ -246,8 +247,13 @@ export default function Renew() {
           }
         });
         setTimeout(() => {
-          if (latLngs.length > 0) mapCompRef.current?.setBounds(latLngs);
-          else mapCompRef.current?.setCenter(lat, lng);
+          if (latLngs.length === 1) {
+            mapCompRef.current?.setCenter(latLngs[0].lat, latLngs[0].lng);
+          } else if (latLngs.length > 1) {
+            mapCompRef.current?.setBounds(latLngs);
+          } else {
+            mapCompRef.current?.setCenter(lat, lng);
+          }
         }, 100);
         return;
       }
@@ -282,16 +288,21 @@ export default function Renew() {
   );
 
   const slotsWithPosition = SLOT_KEYS.filter((n) => slots[n]);
-  /** A1~A4 기반 중심/줌 자동 조정 유지. 실행 순서: 초기엔 Geolocation 중심 → 이후 슬롯 설정 시 bounds */
+  /** A1만 있으면 해당 위치를 지도 가운데로, A1~2면 두 점 영역, A1~3이면 세 점, A1~4면 전부 포함하도록 중심/줌 조정 */
   useEffect(() => {
     if (slotsWithPosition.length === 0) return;
     const latLngs = slotsWithPosition.map((n) => ({
       lat: slots[n]!.lat,
       lng: slots[n]!.lng,
     }));
-    mapCompRef.current?.setBounds(latLngs);
+    if (latLngs.length === 1) {
+      mapCompRef.current?.setCenter(latLngs[0].lat, latLngs[0].lng);
+    } else {
+      mapCompRef.current?.setBounds(latLngs);
+    }
   }, [slots]);
 
+  /** 경쟁사 동향 페이지와 동일: 선택 항목 클립보드 저장. 필수: A1위도, A1경도, A1위도(도분초), A1경도(도분초), A1방향, 도로명주소, 지번주소, 상세위치. 이후 A2~4 위치·방향 있으면 추가 */
   const handleCopyToClipboard = useCallback(async () => {
     const a1 = slots[1];
     if (!a1) {
@@ -352,10 +363,11 @@ export default function Renew() {
   return (
     <AppLayout title="현행화" rightSlot={rightSlot}>
       <div className="flex-1 flex flex-col relative">
+        {/* 지도 영역: 제목(헤더) 높이만큼 더 크게 */}
         <div
           ref={mapContainerRef}
           className="relative overflow-hidden"
-          style={{ height: "45vh", minHeight: "320px" }}
+          style={{ height: "calc(38vh + 56px)", minHeight: "340px" }}
         >
           <KakaoMap
             ref={mapCompRef}
