@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { useAddToHomeScreen } from "@/hooks/useAddToHomeScreen";
 
 interface AppLayoutProps {
   /** 헤더 중앙 제목 */
@@ -21,6 +22,7 @@ const SIDEBAR_ITEMS = [
 export default function AppLayout({ title, rightSlot, children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPath] = useLocation();
+  const { canInstall } = useAddToHomeScreen();
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-50 flex flex-col">
@@ -60,19 +62,31 @@ export default function AppLayout({ title, rightSlot, children }: AppLayoutProps
             <SheetTitle className="text-gray-50">메뉴</SheetTitle>
           </SheetHeader>
           <nav className="flex flex-col py-2">
-            {SIDEBAR_ITEMS.map(({ label, path }) => (
-              <Link
-                key={path}
-                href={path}
-                onClick={() => setSidebarOpen(false)}
-                className={cn(
-                  "px-4 py-3 text-gray-200 hover:bg-gray-700 hover:text-gray-50 transition-colors",
-                  currentPath === path && "bg-gray-700 text-gray-50 font-medium"
-                )}
-              >
-                {label}
-              </Link>
-            ))}
+            {SIDEBAR_ITEMS.map(({ label, path }) => {
+              const isInstall = path === "/install";
+              const isActive = canInstall && isInstall;
+              return isInstall && !isActive ? (
+                <span
+                  key={path}
+                  className="px-4 py-3 text-gray-500 cursor-not-allowed"
+                  aria-disabled
+                >
+                  {label}
+                </span>
+              ) : (
+                <Link
+                  key={path}
+                  href={path}
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "px-4 py-3 text-gray-200 hover:bg-gray-700 hover:text-gray-50 transition-colors",
+                    currentPath === path && "bg-gray-700 text-gray-50 font-medium"
+                  )}
+                >
+                  {label}
+                </Link>
+              );
+            })}
           </nav>
         </SheetContent>
       </Sheet>

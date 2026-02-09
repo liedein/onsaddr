@@ -2,7 +2,6 @@
  * 경쟁사 동향 조회 페이지 (기존 Home 화면)
  * 라우트: /etc
  */
-import { useAddToHomeScreen } from "@/hooks/useAddToHomeScreen";
 import { useState, useEffect, useRef } from "react";
 import KakaoMap from "@/components/KakaoMap";
 import ToastNotification from "@/components/ToastNotification";
@@ -25,7 +24,6 @@ export default function Etc() {
   const [detail, setDetail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
-  const { isSupported, canInstall, promptToInstall } = useAddToHomeScreen();
 
   const [mode, setMode] = useState<"MAP" | "ANT">("MAP");
   const [selectedAnt, setSelectedAnt] = useState<number | null>(null);
@@ -217,23 +215,12 @@ export default function Etc() {
   };
 
   const rightSlot = (
-    <>
-      {isSupported && canInstall && (
-        <button
-          type="button"
-          onClick={promptToInstall}
-          className="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95"
-        >
-          <img src="/icons/mapaddr_32.png" alt="install" className="w-6 h-6" />
-        </button>
-      )}
-      <button
-        onClick={handleRefresh}
-        className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
-      >
-        <RefreshCw className="w-6 h-6" />
-      </button>
-    </>
+    <button
+      onClick={handleRefresh}
+      className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
+    >
+      <RefreshCw className="w-6 h-6" />
+    </button>
   );
 
   return (
