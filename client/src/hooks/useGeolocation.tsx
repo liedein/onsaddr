@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LocationData } from '@/pages/home';
+import type { LocationData } from "@/types/map";
 
 export function useGeolocation() {
   const [currentLocation, setCurrentLocation] = useState<LocationData | null>(null);

@@ -18,6 +18,7 @@ exports.handler = async function (event) {
     const url = new URL("https://dapi.kakao.com/v2/local/geo/coord2address.json");
     url.searchParams.set("x", String(lng));
     url.searchParams.set("y", String(lat));
+    url.searchParams.set("input_coord", "WGS84");
 
     const resp = await fetch(url.toString(), {
       headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` },
@@ -42,7 +43,15 @@ exports.handler = async function (event) {
     }
 
     const address = jibun || road;
-    return { statusCode: 200, body: JSON.stringify({ address, type: jibun ? "jibun" : "road" }) };
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        address,
+        type: jibun ? "jibun" : "road",
+        jibunAddress: jibun || "",
+        roadAddress: road || "",
+      }),
+    };
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ message: "Server error" }) };
   }
