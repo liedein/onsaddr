@@ -11,7 +11,7 @@ import NotFound from "@/pages/not-found";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={() => <Redirect to="/renew" />} />
+      <Route path="/" component={() => <Redirect to="/etc" />} />
       <Route path="/renew" component={Renew} />
       <Route path="/etc" component={Etc} />
       <Route path="/install" component={Install} />
