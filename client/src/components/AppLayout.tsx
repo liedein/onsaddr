@@ -14,7 +14,7 @@ interface AppLayoutProps {
 } 
  
 const SIDEBAR_ITEMS = [ 
-  { label: "현행화", path: "/renew" }, 
+  { label: "시설물 현행화", path: "/renew" }, 
   { label: "경쟁사 동향", path: "/etc" }, 
   { label: "앱 설치", path: "/install", isInstallMenu: true }, 
 ] as const; 

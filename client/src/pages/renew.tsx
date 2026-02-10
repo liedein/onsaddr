@@ -1,8 +1,18 @@
 /**
- * 현행화 페이지
+ * 시설물 현행화 페이지
  * 라우트: /renew
- * - etc.tsx와 동일한 UX: 새로고침 버튼, A1~A4 우하단, Geolocation, 금일 조회 횟수
- * - MAP/ANT 대신 "위치/방향" 토글로만 동작
+ * 
+ * [주요 변경사항]
+ * 1. 초기 지도: 사용자 현재 위치 중심, 기본 Pin 제거 (showCenterMarker=false)
+ * 2. A1~A4 버튼 초기 상태: 회색 (위치 미설정 상태)
+ * 3. 위치 모드: 
+ *    - A1~A4 선택 없이 지도 터치 → 아무 동작 없음
+ *    - A1~A4 선택 후 지도 터치 → 원 아이콘 생성, 전체 위치들의 중심으로 지도 이동
+ * 4. 방향 모드: 
+ *    - 위치 미설정 버튼 비활성화(disabled)
+ *    - 활성 버튼 선택 후 지도 터치 → 화살표 생성 (지도 중심 이동 없음)
+ *    - 활성 버튼 미선택 시 지도 터치 → 아무 동작 없음
+ * 5. 지도 이동/줌은 항상 가능
  */
 import { useState, useRef, useEffect, useCallback } from "react";
 import KakaoMap from "@/components/KakaoMap";
@@ -16,15 +26,16 @@ import { latToDMS, lngToDMS } from "@/lib/coordinates";
 import { copyToClipboard } from "@/lib/clipboard";
 
 const SLOT_KEYS = [1, 2, 3, 4] as const;
-/** etc.tsx와 동일한 A1~A4 색상 정의 */
-const antColors: Record<number, { hex: string; bg: string; active: string }> = {
-  1: { hex: "#f43f5e", bg: "bg-rose-500", active: "bg-rose-700" },
-  2: { hex: "#10b981", bg: "bg-emerald-500", active: "bg-emerald-700" },
-  3: { hex: "#0ea5e9", bg: "bg-sky-500", active: "bg-sky-700" },
-  4: { hex: "#8b5cf6", bg: "bg-violet-500", active: "bg-violet-700" },
+
+/** A1~A4 색상 정의 (경쟁사 동향 페이지와 동일) */
+const antColors: Record<number, { hex: string; bg: string; active: string; inactive: string }> = {
+  1: { hex: "#f43f5e", bg: "bg-rose-500", active: "bg-rose-700", inactive: "bg-gray-500" },
+  2: { hex: "#10b981", bg: "bg-emerald-500", active: "bg-emerald-700", inactive: "bg-gray-500" },
+  3: { hex: "#0ea5e9", bg: "bg-sky-500", active: "bg-sky-700", inactive: "bg-gray-500" },
+  4: { hex: "#8b5cf6", bg: "bg-violet-500", active: "bg-violet-700", inactive: "bg-gray-500" },
 };
 
-/** 화살표 꼭지점 계산 (etc handleMapAreaClick과 동일 로직) */
+/** 화살표 꼭지점 계산 (경쟁사 동향 페이지 handleMapAreaClick과 동일 로직) */
 function getArrowPoints(
   sx: number,
   sy: number,
@@ -43,26 +54,37 @@ function getArrowPoints(
 }
 
 export default function Renew() {
-  const [locationDirectionMode, setLocationDirectionMode] = useState<"위치" | "방향">("위치");
+  // 위치/방향 모드
+  const [mode, setMode] = useState<"위치" | "방향">("위치");
+  
+  // A1~A4 각 슬롯 데이터 (위치 + 방향)
   const [slots, setSlots] = useState<Record<number, SlotData | null>>({
     1: null,
     2: null,
     3: null,
     4: null,
   });
+  
+  // 현재 선택된 A# 버튼 (위치 모드 또는 방향 모드에서)
   const [selectedAnt, setSelectedAnt] = useState<number | null>(null);
+  
+  // 패널에 표시할 위치 정보 (위치 모드에서 A# 미선택 시 사용 - 현재는 사용 안 함)
   const [panelLocation, setPanelLocation] = useState<LocationData | null>(null);
+  
   const [subAddress, setSubAddress] = useState("");
   const [detail, setDetail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
+  
+  // 화살표 픽셀 좌표 (지도 위 SVG 렌더링용)
   const [arrowPoints, setArrowPoints] = useState<Record<number, AntInfo["points"] | null>>({
     1: null,
     2: null,
     3: null,
     4: null,
   });
-  /** 위치를 설정한 A1~A4의 픽셀 좌표 (지도 위 원형 포인트 그리기용) */
+  
+  // A1~A4 위치의 픽셀 좌표 (원형 포인트 SVG 렌더링용)
   const [circlePixelPositions, setCirclePixelPositions] = useState<Record<number, { x: number; y: number } | null>>({
     1: null,
     2: null,
@@ -76,7 +98,7 @@ export default function Renew() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapCompRef = useRef<KakaoMapRef | null>(null);
 
-  /** etc와 동일: 금일 조회 횟수 localStorage */
+  // 금일 조회 횟수 localStorage
   useEffect(() => {
     const today = new Date().toLocaleDateString();
     const savedData = localStorage.getItem("map_usage");
@@ -101,23 +123,17 @@ export default function Renew() {
     });
   };
 
+  // 사용자 현재 위치 가져오기 (Geolocation)
   const { currentLocation, isLoadingLocation } = useGeolocation();
-
-  /** 초기 진입 시: Geolocation으로 현재 위치 → 지도 중심 (고정 좌표 사용 금지) */
-  useEffect(() => {
-    if (!panelLocation && !slots[1] && currentLocation) {
-      setPanelLocation(currentLocation);
-    }
-  }, [currentLocation]);
 
   const showToast = useCallback((message: string, type: "success" | "error") => {
     setToast({ message, type, isVisible: true });
     setTimeout(() => setToast(null), 2000);
   }, []);
 
-  /** etc와 동일: 새로고침 시 페이지 reload → Geolocation 재실행 */
   const handleRefresh = () => window.location.reload();
 
+  // 좌표 → 주소 변환 API 호출
   const fetchAddress = useCallback(
     async (lat: number, lng: number): Promise<{ address: string; roadAddress?: string; jibunAddress?: string }> => {
       const res = await fetch("/api/coordinate-to-address", {
@@ -136,22 +152,31 @@ export default function Renew() {
     []
   );
 
-  /** 화살표 픽셀 좌표 + 위치 설정된 A1~A4 원형 포인트 픽셀 좌표 갱신 (지도 이동/줌 시 호출) */
+  // 화살표 픽셀 좌표 + 원형 포인트 픽셀 좌표 갱신 (지도 이동/줌 시 호출)
   const updateArrowPoints = useCallback(() => {
     const ref = mapCompRef.current;
     if (!ref) return;
+    
     const nextArrow: Record<number, AntInfo["points"] | null> = { 1: null, 2: null, 3: null, 4: null };
     const nextCircle: Record<number, { x: number; y: number } | null> = { 1: null, 2: null, 3: null, 4: null };
+    
     SLOT_KEYS.forEach((num) => {
       const slot = slots[num];
       if (!slot || slot.lat == null || slot.lng == null) return;
+      
+      // 위도/경도 → 픽셀 좌표 변환
       const pt = ref.getPointFromLatLng(slot.lat, slot.lng);
       if (!pt) return;
+      
+      // 원형 포인트 픽셀 좌표 저장
       nextCircle[num] = { x: pt.x, y: pt.y };
+      
+      // 방향이 설정된 경우 화살표 픽셀 좌표 계산
       if (slot.direction) {
         nextArrow[num] = getArrowPoints(pt.x, pt.y, slot.direction.angle);
       }
     });
+    
     setArrowPoints(nextArrow);
     setCirclePixelPositions(nextCircle);
   }, [slots]);
@@ -160,250 +185,210 @@ export default function Renew() {
     updateArrowPoints();
   }, [slots, updateArrowPoints]);
 
+  // 지도 idle 이벤트 핸들러 (지도 이동/줌 후 오버레이 위치 갱신)
   const handleMapIdle = useCallback(() => {
     updateArrowPoints();
   }, [updateArrowPoints]);
 
-  const circlePositions = SLOT_KEYS.map((num) => {
-    const s = slots[num];
-    if (!s) return null;
-    return { lat: s.lat, lng: s.lng, label: `A${num}` };
-  }).filter(Boolean) as Array<{ lat: number; lng: number; label?: string }>;
+  // 선택된 위치들의 중심 좌표 계산 및 지도 이동
+  const moveToSelectedLocationsCenter = useCallback(() => {
+    const ref = mapCompRef.current;
+    if (!ref) return;
 
-  /** 지도 중심/마커: 현재 위치 → A1 → 패널 순 (Geolocation 우선) */
-  const selectedLocationForMap =
-    panelLocation ?? (slots[1] ? { lat: slots[1].lat, lng: slots[1].lng, address: slots[1].address } : null);
+    const locations = SLOT_KEYS.map(num => slots[num])
+      .filter((slot): slot is SlotData => slot !== null);
 
-  /** 위치 모드 + A# 미선택 시 지도 클릭 → 패널 위치 설정 (etc의 handleLocationSelect와 동일 역할) */
-  const handleLocationSelect = useCallback(
-    async (location: LocationData) => {
-      if (locationDirectionMode !== "위치" || selectedAnt !== null) return;
-      if (usageCount >= USAGE_LIMIT) {
-        showToast("오늘 조회 한도(100회)에 도달했습니다.", "error");
-        return;
-      }
-      setPanelLocation({ ...location, address: "주소를 불러오는 중..." });
-      try {
-        setIsLoading(true);
-        const data = await fetchAddress(location.lat, location.lng);
-        setPanelLocation({
-          lat: location.lat,
-          lng: location.lng,
-          address: data.jibunAddress || data.address,
-          roadAddress: data.roadAddress,
-          jibunAddress: data.jibunAddress,
-        });
-        incrementUsage();
-      } catch {
-        showToast("주소를 가져오는데 실패했습니다.", "error");
-        setPanelLocation((prev) => (prev ? { ...prev, address: "" } : null));
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [locationDirectionMode, selectedAnt, usageCount, fetchAddress, showToast]
-  );
+    if (locations.length === 0) return;
 
+    if (locations.length === 1) {
+      // 1개만 있으면 해당 위치로 중심 이동
+      ref.setCenter(locations[0].lat, locations[0].lng);
+    } else {
+      // 2개 이상이면 모든 위치가 보이도록 bounds 설정
+      const latLngs = locations.map(loc => ({ lat: loc.lat, lng: loc.lng }));
+      ref.setBounds(latLngs, 100);
+    }
+  }, [slots]);
+
+  // 지도 클릭 핸들러 - 위치/방향 모드에 따라 분기
   const handleMapClick = useCallback(
     async (lat: number, lng: number) => {
-      if (locationDirectionMode === "위치" && selectedAnt !== null) {
-        // 위치 재지정 시 해당 A#의 방향은 함께 삭제 (A1~A4 동일 규칙)
-        setSlots((prev) => {
-          const next = { ...prev };
-          next[selectedAnt] = {
-            lat,
-            lng,
-            address: "로딩 중...",
-            direction: null,
-          };
-          return next;
-        });
+      // 위치 모드
+      if (mode === "위치") {
+        // A# 버튼이 선택되지 않은 경우 → 아무 동작 없음
+        if (selectedAnt === null) return;
+
+        // 조회 한도 체크
         if (usageCount >= USAGE_LIMIT) {
           showToast("오늘 조회 한도(100회)에 도달했습니다.", "error");
           return;
         }
+
+        // 선택된 버튼에 위치 설정
         try {
           setIsLoading(true);
           const data = await fetchAddress(lat, lng);
-          setSlots((prev) => {
-            const next = { ...prev };
-            if (next[selectedAnt]) {
-              next[selectedAnt] = {
-                ...next[selectedAnt]!,
-                address: data.jibunAddress || data.address,
-                roadAddress: data.roadAddress,
-                jibunAddress: data.jibunAddress,
-              };
-            }
-            return next;
-          });
-          if (selectedAnt === 1) {
-            setPanelLocation({
+          
+          setSlots(prev => ({
+            ...prev,
+            [selectedAnt]: {
               lat,
               lng,
               address: data.jibunAddress || data.address,
               roadAddress: data.roadAddress,
               jibunAddress: data.jibunAddress,
-            });
-          }
+              direction: null, // 위치 재지정 시 방향 초기화
+            }
+          }));
+          
           incrementUsage();
+          
+          // 위치 설정 후 지도 중심 이동 (모든 선택된 위치들의 중심으로)
+          setTimeout(() => {
+            moveToSelectedLocationsCenter();
+          }, 100);
         } catch {
           showToast("주소를 가져오는데 실패했습니다.", "error");
         } finally {
           setIsLoading(false);
         }
-
-        const latLngs: Array<{ lat: number; lng: number }> = [{ lat, lng }];
-        SLOT_KEYS.forEach((n) => {
-          if (n !== selectedAnt && slots[n]) {
-            latLngs.push({ lat: slots[n]!.lat, lng: slots[n]!.lng });
-          }
-        });
-        setTimeout(() => {
-          if (latLngs.length === 1) {
-            mapCompRef.current?.setCenter(latLngs[0].lat, latLngs[0].lng);
-          } else if (latLngs.length > 1) {
-            mapCompRef.current?.setBounds(latLngs);
-          } else {
-            mapCompRef.current?.setCenter(lat, lng);
-          }
-          updateArrowPoints();
-        }, 150);
-        return;
       }
+      // 방향 모드
+      else if (mode === "방향") {
+        // A# 버튼이 선택되지 않은 경우 → 아무 동작 없음
+        if (selectedAnt === null) return;
 
-      if (locationDirectionMode === "방향" && selectedAnt !== null) {
+        // 선택된 버튼에 위치가 설정되어 있지 않으면 → 아무 동작 없음
         const slot = slots[selectedAnt];
         if (!slot) return;
+
+        // 지도 컨테이너에서 클릭 위치 계산 (경쟁사 동향 페이지와 동일 로직)
+        if (!mapContainerRef.current) return;
+        
         const ref = mapCompRef.current;
         if (!ref) return;
-        const slotPt = ref.getPointFromLatLng(slot.lat, slot.lng);
+
+        // 슬롯 위치의 픽셀 좌표 가져오기
+        const centerPt = ref.getPointFromLatLng(slot.lat, slot.lng);
+        if (!centerPt) return;
+
+        // 클릭한 위치의 픽셀 좌표 가져오기
         const clickPt = ref.getPointFromLatLng(lat, lng);
-        if (!slotPt || !clickPt) return;
-        const angleRad = Math.atan2(clickPt.y - slotPt.y, clickPt.x - slotPt.x);
+        if (!clickPt) return;
+
+        // 각도 계산 (경쟁사 동향 페이지 로직)
+        const angleRad = Math.atan2(clickPt.y - centerPt.y, clickPt.x - centerPt.x);
         let deg = Math.round(angleRad * (180 / Math.PI) + 90);
         if (deg < 0) deg += 360;
         if (deg >= 360) deg -= 360;
-        const points = getArrowPoints(slotPt.x, slotPt.y, deg);
-        setSlots((prev) => {
-          const next = { ...prev };
-          if (next[selectedAnt]) {
-            next[selectedAnt] = {
-              ...next[selectedAnt]!,
-              direction: { angle: deg, points },
-            };
+
+        // 방향 정보 저장 (지도 중심 이동 없음)
+        setSlots(prev => ({
+          ...prev,
+          [selectedAnt]: {
+            ...slot,
+            direction: {
+              angle: deg,
+              points: getArrowPoints(centerPt.x, centerPt.y, deg),
+            }
           }
-          return next;
-        });
-        setArrowPoints((prev) => ({ ...prev, [selectedAnt]: points }));
+        }));
       }
     },
-    [locationDirectionMode, selectedAnt, slots, usageCount, fetchAddress, showToast, updateArrowPoints]
+    [mode, selectedAnt, slots, usageCount, fetchAddress, incrementUsage, showToast, moveToSelectedLocationsCenter]
   );
 
-  const slotsWithPosition = SLOT_KEYS.filter((n) => slots[n]);
-  /** A1만 있으면 해당 위치를 지도 가운데로, A1~2면 두 점 영역, A1~3이면 세 점, A1~4면 전부 포함하도록 중심/줌 조정 */
-  useEffect(() => {
-    if (slotsWithPosition.length === 0) return;
-    const latLngs = slotsWithPosition.map((n) => ({
-      lat: slots[n]!.lat,
-      lng: slots[n]!.lng,
-    }));
-    if (latLngs.length === 1) {
-      mapCompRef.current?.setCenter(latLngs[0].lat, latLngs[0].lng);
-    } else {
-      mapCompRef.current?.setBounds(latLngs);
-    }
-  }, [slots]);
+  // A# 버튼 클릭 핸들러
+  const handleAntButtonClick = useCallback((num: number) => {
+    setSelectedAnt(prev => prev === num ? null : num);
+  }, []);
 
-  /** 경쟁사 동향 페이지와 동일: 선택 항목 클립보드 저장. 필수: A1위도, A1경도, A1위도(도분초), A1경도(도분초), A1방향, 도로명주소, 지번주소, 상세위치. 이후 A2~4 위치·방향 있으면 추가 */
+  // 복사 버튼 핸들러
   const handleCopyToClipboard = useCallback(async () => {
-    const a1 = slots[1];
-    if (!a1) {
+    if (!slots[1]) {
       showToast("A1 위치를 먼저 설정해주세요.", "error");
       return;
     }
 
-    const roadAddr = a1.roadAddress ?? "";
-    const jibunAddr = a1.jibunAddress ?? a1.address ?? "";
-    const a1Lat = a1.lat.toFixed(6);
-    const a1Lng = a1.lng.toFixed(6);
-    const a1LatDMS = latToDMS(a1.lat);
-    const a1LngDMS = lngToDMS(a1.lng);
-    const a1Dir = a1.direction ? String(a1.direction.angle) : "";
+    let copyText = "";
 
-    const lines: string[] = [
-      `A1 위도: ${a1Lat}`,
-      `A1 경도: ${a1Lng}`,
-      `A1 위도(도분초): ${a1LatDMS}`,
-      `A1 경도(도분초): ${a1LngDMS}`,
-      `A1 방향: ${a1Dir}`,
-      `도로명주소: ${roadAddr}`,
-      `지번주소: ${jibunAddr}`,
-      `상세위치: ${subAddress}`,
-    ];
+    // A1~A4 각각 정보 추가
+    SLOT_KEYS.forEach(num => {
+      const slot = slots[num];
+      if (!slot) return;
 
-    for (const num of [2, 3, 4]) {
-      const s = slots[num];
-      if (!s) continue;
-      lines.push(
-        `A${num} 위도: ${s.lat.toFixed(6)}`,
-        `A${num} 경도: ${s.lng.toFixed(6)}`,
-        `A${num} 위도(도분초): ${latToDMS(s.lat)}`,
-        `A${num} 경도(도분초): ${lngToDMS(s.lng)}`,
-        `A${num} 방향: ${s.direction ? s.direction.angle : ""}`
-      );
+      copyText += `\n[A${num}]\n`;
+      copyText += `위도: ${slot.lat.toFixed(6)}\n`;
+      copyText += `경도: ${slot.lng.toFixed(6)}\n`;
+      copyText += `지번주소: ${slot.address || ""}\n`;
+      if (slot.direction) {
+        copyText += `방향: ${slot.direction.angle}°\n`;
+      }
+    });
+
+    if (subAddress) {
+      copyText += `\n상세위치: ${subAddress}\n`;
+    }
+    if (detail) {
+      copyText += `세부내역: ${detail}\n`;
     }
 
-    const copyText = lines.join("\n");
-    const ok = await copyToClipboard(copyText);
-    if (ok) showToast("클립보드에 복사되었습니다!", "success");
-    else showToast("복사에 실패했습니다.", "error");
-  }, [slots, subAddress, showToast]);
+    const success = await copyToClipboard(copyText.trim());
+    if (success) {
+      showToast("클립보드에 복사되었습니다!", "success");
+    } else {
+      showToast("복사에 실패했습니다.", "error");
+    }
+  }, [slots, subAddress, detail, showToast]);
 
-  const displayLocation =
-    panelLocation ?? (slots[1] ? { lat: slots[1].lat, lng: slots[1].lng, address: slots[1].address } : null);
+  // 지도에 표시할 위치 결정 (currentLocation 우선)
+  const selectedLocationForMap = currentLocation;
 
-  /** etc와 동일: 헤더 우측 새로고침 버튼 (JSX·아이콘·클래스·핸들러 이름·동작) */
-  const rightSlot = (
-    <button
-      onClick={handleRefresh}
-      className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
-    >
-      <RefreshCw className="w-6 h-6" />
-    </button>
-  );
+  // 패널에 표시할 위치 정보 (A1 우선, 없으면 panelLocation)
+  const displayLocation = slots[1] ?? panelLocation;
 
   return (
-    <AppLayout title="현행화" rightSlot={rightSlot}>
-      <div className="flex-1 flex flex-col relative">
-        {/* 지도 영역: 제목(헤더) 높이만큼 더 크게 */}
+    <AppLayout
+      title="시설물 현행화"
+      rightSlot={
+        <button
+          onClick={handleRefresh}
+          className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
+        >
+          <RefreshCw className="w-6 h-6" />
+        </button>
+      }
+    >
+      <div className="flex-1 flex flex-col">
+        {/* 지도 영역 */}
         <div
           ref={mapContainerRef}
           className="relative overflow-hidden"
-          style={{ height: "calc(38vh + 56px)", minHeight: "340px" }}
+          style={{ height: "38vh", minHeight: "270px" }}
         >
           <KakaoMap
             ref={mapCompRef}
-            initialLevel={1}
-            showCenterMarker={true}
-            mode="MAP"
             initialLocation={currentLocation}
             selectedLocation={selectedLocationForMap}
-            onLocationSelect={handleLocationSelect}
+            mode="MAP"
+            initialLevel={2}
+            showCenterMarker={false} // 초기 Pin 제거
+            circlePositions={[]} // SVG로 직접 렌더링하므로 빈 배열
             onMapClick={handleMapClick}
             onMapIdle={handleMapIdle}
-            circlePositions={circlePositions}
             isLoading={isLoading || isLoadingLocation}
           />
 
-          {/* MAP/ANT 제거 → 위치/방향 토글만 (기존 토글 위치) */}
+          {/* 위치/방향 토글 버튼 (좌하단) */}
           <div className="absolute bottom-4 left-4 flex rounded-md overflow-hidden shadow-md bg-gray-800/90 z-20">
             <button
               type="button"
-              onClick={() => setLocationDirectionMode("위치")}
+              onClick={() => {
+                setMode("위치");
+                setSelectedAnt(null);
+              }}
               className={`w-16 h-[42px] shrink-0 font-bold text-sm transition-all duration-200 active:scale-95 ${
-                locationDirectionMode === "위치"
+                mode === "위치"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-700 text-gray-300 hover:bg-gray-600"
               }`}
@@ -412,9 +397,12 @@ export default function Renew() {
             </button>
             <button
               type="button"
-              onClick={() => setLocationDirectionMode("방향")}
+              onClick={() => {
+                setMode("방향");
+                setSelectedAnt(null);
+              }}
               className={`w-16 h-[42px] shrink-0 font-bold text-sm transition-all duration-200 active:scale-95 ${
-                locationDirectionMode === "방향"
+                mode === "방향"
                   ? "bg-orange-600 text-white"
                   : "bg-gray-700 text-gray-300 hover:bg-gray-600"
               }`}
@@ -423,35 +411,41 @@ export default function Renew() {
             </button>
           </div>
 
-          {/* etc와 동일: A1~A4 지도 우하단, 가로 배열, 동일 스타일 */}
-          {/* etc와 동일: 지도 우하단, 가로 배열, 버튼 간격·색·크기·border·선택 스타일 동일 */}
+          {/* A1~A4 버튼 (우하단) */}
           <div className="absolute bottom-4 right-4 flex space-x-2 z-20">
             {SLOT_KEYS.map((num) => {
               const config = antColors[num];
               const isSelected = selectedAnt === num;
-              const hasValue = slots[num] !== null;
-              const canSelectDirection = locationDirectionMode === "방향" ? hasValue : true;
+              const hasLocation = slots[num] !== null;
+              
+              // 방향 모드에서는 위치가 설정되지 않은 버튼 비활성화
+              const isDisabled = mode === "방향" && !hasLocation;
 
+              // 버튼 스타일 결정
               let buttonStyle = "";
               if (isSelected) {
-                buttonStyle = `${config.active} border-white scale-110 shadow-xl z-30 opacity-100`;
-              } else if (hasValue) {
-                buttonStyle = `${config.bg} border-transparent opacity-100 shadow-md`;
+                // 선택된 상태
+                buttonStyle = `${config.active} border-white scale-110 shadow-xl z-30`;
+              } else if (hasLocation) {
+                // 위치가 설정된 상태 (원래 색상)
+                buttonStyle = `${config.bg} border-transparent shadow-md`;
               } else {
-                buttonStyle = `${config.bg} border-transparent opacity-70`;
+                // 위치가 설정되지 않은 상태 (회색)
+                buttonStyle = `${config.inactive} border-transparent opacity-70`;
               }
 
               return (
                 <button
                   key={num}
                   type="button"
-                  disabled={!canSelectDirection}
+                  disabled={isDisabled}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!canSelectDirection) return;
-                    setSelectedAnt(isSelected ? null : num);
+                    if (!isDisabled) {
+                      handleAntButtonClick(num);
+                    }
                   }}
-                  className={`w-12 h-10 rounded text-white font-bold transition-all duration-200 active:scale-90 border-2 ${buttonStyle} ${!canSelectDirection ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className={`w-12 h-10 rounded text-white font-bold transition-all duration-200 active:scale-90 border-2 ${buttonStyle} ${isDisabled ? "opacity-30 cursor-not-allowed" : ""}`}
                 >
                   {slots[num]?.direction?.angle ?? `A${num}`}
                 </button>
@@ -459,8 +453,9 @@ export default function Renew() {
             })}
           </div>
 
-          {/* 위치 설정 시마다 원형 포인트 표시 (A1~A4) */}
+          {/* 원형 포인트 + 화살표 SVG 오버레이 */}
           <svg className="absolute inset-0 pointer-events-none w-full h-full z-10">
+            {/* 원형 포인트 렌더링 */}
             {SLOT_KEYS.map((num) => {
               const pos = circlePixelPositions[num];
               if (!pos) return null;
@@ -479,7 +474,8 @@ export default function Renew() {
                 </g>
               );
             })}
-            {/* 경쟁사 동향 페이지와 동일: 화살표 로직 */}
+            
+            {/* 화살표 렌더링 (경쟁사 동향 페이지와 동일) */}
             {SLOT_KEYS.map((num) => {
               const pts = arrowPoints[num];
               if (!pts) return null;
@@ -505,6 +501,7 @@ export default function Renew() {
           </svg>
         </div>
 
+        {/* 하단 폼 영역 */}
         <div className="bg-gray-800 border-t border-gray-700 pt-5 pb-4 px-2 flex flex-col space-y-3">
           <div className="flex items-stretch space-x-2">
             <div className="flex flex-col flex-1 space-y-2">
@@ -578,7 +575,7 @@ export default function Renew() {
             />
           </div>
 
-          {/* etc와 동일: 금일 조회 횟수 위치·스타일·로직 유지 */}
+          {/* 금일 조회 횟수 */}
           <div className="mt-3 text-center pb-0 border-t border-gray-700 pt-3">
             <span className="text-sm text-gray-300">금일 조회 횟수: </span>
             <span className="text-sm text-emerald-400 font-medium">{usageCount}</span>
@@ -586,6 +583,7 @@ export default function Renew() {
           </div>
         </div>
       </div>
+      
       <ToastNotification
         message={toast?.message ?? ""}
         type={toast?.type ?? "success"}

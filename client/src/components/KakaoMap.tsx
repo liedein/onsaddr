@@ -65,6 +65,8 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
     modeRef.current = mode;
     if (mapInstance.current) {
       const isAntMode = mode === "ANT";
+      // ANT 모드에서는 드래그/줌 비활성화
+      // MAP 모드에서는 항상 활성화 (현행화 페이지의 위치/방향 모드도 MAP 모드 사용)
       mapInstance.current.setDraggable(!isAntMode);
       mapInstance.current.setZoomable(!isAntMode);
     }
@@ -102,10 +104,12 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
     getMap: () => mapInstance.current,
   }));
 
+  // 지도 초기화
   useEffect(() => {
     if (!window.kakao || !mapRef.current) return;
 
     window.kakao.maps.load(() => {
+      // 초기 위치: initialLocation이 있으면 사용 (현재 위치), 없으면 기본값
       const defaultLat = initialLocation?.lat ?? 37.5665;
       const defaultLng = initialLocation?.lng ?? 126.978;
 
@@ -116,6 +120,8 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
 
       mapInstance.current = new window.kakao.maps.Map(mapRef.current, mapOption);
 
+      // showCenterMarker가 true일 때만 중심 마커 표시
+      // 현행화 페이지는 false로 설정하여 초기 Pin 제거
       if (showCenterMarker) {
         markerInstance.current = new window.kakao.maps.Marker({
           position: mapInstance.current.getCenter(),
@@ -129,21 +135,28 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
       mapInstance.current.setDraggable(!isAntMode);
       mapInstance.current.setZoomable(!isAntMode);
 
+      // 지도 클릭 이벤트
       window.kakao.maps.event.addListener(mapInstance.current, "click", (mouseEvent: any) => {
         const latlng = mouseEvent.latLng;
         const lat = latlng.getLat();
         const lng = latlng.getLng();
+        
+        // onMapClick은 항상 호출 (현행화 페이지에서 위치/방향 로직 처리)
         if (onMapClick) onMapClick(lat, lng);
+        
+        // MAP 모드에서만 onLocationSelect 호출 (경쟁사 동향 페이지)
         if (modeRef.current === "MAP" && onLocationSelect) {
           onLocationSelect({ lat, lng });
         }
       });
 
+      // idle 이벤트 리스너 (지도 이동/줌 후 화살표 위치 갱신용)
       if (onMapIdle) {
         const handler = () => onMapIdle();
         idleHandlerRef.current = handler;
         window.kakao.maps.event.addListener(mapInstance.current, "idle", handler);
       }
+      
       setMapReady(true);
     });
 
@@ -170,12 +183,15 @@ const KakaoMap = memo(forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
   }, [selectedLocation?.lat, selectedLocation?.lng, showCenterMarker]);
 
   // 원형 마커 갱신 (지도 로드 완료 후 + circlePositions 변경 시)
+  // 주의: 현행화 페이지는 circlePositions를 빈 배열로 전달하고 SVG로 직접 렌더링
   useEffect(() => {
     if (!window.kakao || !mapInstance.current || !mapReady) return;
 
+    // 기존 원형 마커 제거
     circleInstances.current.forEach((c) => c.setMap(null));
     circleInstances.current = [];
 
+    // 새로운 원형 마커 생성
     circlePositions.forEach((pos) => {
       const circle = new window.kakao.maps.Circle({
         center: new window.kakao.maps.LatLng(pos.lat, pos.lng),
