@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Renew from "@/pages/renew";
 import Etc from "@/pages/etc";
-import Install from "@/pages/install";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -14,7 +13,6 @@ function Router() {
       <Route path="/" component={() => <Redirect to="/etc" />} />
       <Route path="/renew" component={Renew} />
       <Route path="/etc" component={Etc} />
-      <Route path="/install" component={Install} />
       <Route component={NotFound} />
     </Switch>
   );
