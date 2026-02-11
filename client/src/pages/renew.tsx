@@ -156,59 +156,77 @@ export default function Renew() {
   const updateArrowPoints = useCallback(() => {
     const ref = mapCompRef.current;
     if (!ref) return;
-    
-    const nextArrow: Record<number, AntInfo["points"] | null> = { 1: null, 2: null, 3: null, 4: null };
-    const nextCircle: Record<number, { x: number; y: number } | null> = { 1: null, 2: null, 3: null, 4: null };
-    
+
+    const nextArrow = { 1: null, 2: null, 3: null, 4: null };
+    const nextCircle = { 1: null, 2: null, 3: null, 4: null };
+
     SLOT_KEYS.forEach((num) => {
       const slot = slots[num];
-      if (!slot || slot.lat == null || slot.lng == null) return;
-      
-      // 위도/경도 → 픽셀 좌표 변환
+      if (!slot) return;
+
       const pt = ref.getPointFromLatLng(slot.lat, slot.lng);
       if (!pt) return;
-      
-      // 원형 포인트 픽셀 좌표 저장
+
       nextCircle[num] = { x: pt.x, y: pt.y };
-      
-      // 방향이 설정된 경우 화살표 픽셀 좌표 계산
+
       if (slot.direction) {
         nextArrow[num] = getArrowPoints(pt.x, pt.y, slot.direction.angle);
       }
     });
-    
-    setArrowPoints(nextArrow);
+
     setCirclePixelPositions(nextCircle);
+    setArrowPoints(nextArrow);
   }, [slots]);
 
-  useEffect(() => {
-    updateArrowPoints();
-  }, [slots, updateArrowPoints]);
+// ✅ idle + mapReady 이후 항상 동기화
+const handleMapIdle = useCallback(() => {
+  updateArrowPoints();
+}, [updateArrowPoints]);
 
-  // 지도 idle 이벤트 핸들러 (지도 이동/줌 후 오버레이 위치 갱신)
-  const handleMapIdle = useCallback(() => {
-    updateArrowPoints();
-  }, [updateArrowPoints]);
+// 🔧 방향 모드 클릭 로직 보정
+const handleMapClick = useCallback(async (lat: number, lng: number) => {
 
-  // 선택된 위치들의 중심 좌표 계산 및 지도 이동
-  const moveToSelectedLocationsCenter = useCallback(() => {
+  if (mode === "방향") {
+    if (selectedAnt === null) return;
+    const slot = slots[selectedAnt];
+    if (!slot) return;
+
     const ref = mapCompRef.current;
     if (!ref) return;
 
-    const locations = SLOT_KEYS.map(num => slots[num])
-      .filter((slot): slot is SlotData => slot !== null);
+    const centerPt = ref.getPointFromLatLng(slot.lat, slot.lng);
+    const clickPt = ref.getPointFromLatLng(lat, lng);
+    if (!centerPt || !clickPt) return;
 
-    if (locations.length === 0) return;
+    const angleRad = Math.atan2(
+      clickPt.y - centerPt.y,
+      clickPt.x - centerPt.x
+    );
 
-    if (locations.length === 1) {
-      // 1개만 있으면 해당 위치로 중심 이동
-      ref.setCenter(locations[0].lat, locations[0].lng);
-    } else {
-      // 2개 이상이면 모든 위치가 보이도록 bounds 설정
-      const latLngs = locations.map(loc => ({ lat: loc.lat, lng: loc.lng }));
-      ref.setBounds(latLngs, 100);
-    }
-  }, [slots]);
+    let deg = Math.round(angleRad * (180 / Math.PI) + 90);
+    if (deg < 0) deg += 360;
+    if (deg >= 360) deg -= 360;
+
+    setSlots(prev => {
+      const updated = {
+        ...prev,
+        [selectedAnt]: {
+          ...slot,
+          direction: {
+            angle: deg,
+            points: getArrowPoints(centerPt.x, centerPt.y, deg),
+          }
+        }
+      };
+
+      // ✅ 즉시 픽셀좌표 재계산 트리거
+      setTimeout(updateArrowPoints, 0);
+
+      return updated;
+    });
+
+    return;
+  }
 
   // 지도 클릭 핸들러 - 위치/방향 모드에 따라 분기
   const handleMapClick = useCallback(
