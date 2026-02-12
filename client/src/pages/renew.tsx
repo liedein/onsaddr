@@ -157,8 +157,9 @@ export default function Renew() {
     const ref = mapCompRef.current;
     if (!ref) return;
 
-    const nextArrow = { 1: null, 2: null, 3: null, 4: null };
-    const nextCircle = { 1: null, 2: null, 3: null, 4: null };
+    // ✅ 타입을 명시적으로 지정
+    const nextArrow: Record<number, AntInfo["points"] | null> = { 1: null, 2: null, 3: null, 4: null };
+    const nextCircle: Record<number, { x: number; y: number } | null> = { 1: null, 2: null, 3: null, 4: null };
 
     SLOT_KEYS.forEach((num) => {
       const slot = slots[num];
@@ -178,10 +179,31 @@ export default function Renew() {
     setArrowPoints(nextArrow);
   }, [slots]);
 
-// ✅ idle + mapReady 이후 항상 동기화
-const handleMapIdle = useCallback(() => {
-  updateArrowPoints();
-}, [updateArrowPoints]);
+  // 선택된 모든 위치의 중심으로 지도 이동
+  const moveToSelectedLocationsCenter = useCallback(() => {
+    const ref = mapCompRef.current;
+    if (!ref) return;
+
+    // 위치가 설정된 슬롯들만 필터링
+    const validSlots = SLOT_KEYS.map(num => slots[num]).filter((slot): slot is SlotData => slot !== null);
+    
+    if (validSlots.length === 0) return;
+
+    // 모든 위치의 평균 좌표 계산
+    const avgLat = validSlots.reduce((sum, slot) => sum + slot.lat, 0) / validSlots.length;
+    const avgLng = validSlots.reduce((sum, slot) => sum + slot.lng, 0) / validSlots.length;
+
+    // ✅ KakaoMapRef에 직접 메서드가 없으므로 mapInstance 사용
+    if ('mapInstance' in ref && ref.mapInstance) {
+      const latlng = new window.kakao.maps.LatLng(avgLat, avgLng);
+      (ref.mapInstance as any).setCenter(latlng);
+    }
+  }, [slots]);
+
+  // ✅ idle + mapReady 이후 항상 동기화
+  const handleMapIdle = useCallback(() => {
+    updateArrowPoints();
+  }, [updateArrowPoints]);
 
   // 지도 클릭 핸들러 - 위치/방향 모드에 따라 분기
   const handleMapClick = useCallback(
@@ -266,9 +288,12 @@ const handleMapIdle = useCallback(() => {
             }
           }
         }));
+
+        // ✅ 즉시 픽셀좌표 재계산 트리거
+        setTimeout(updateArrowPoints, 0);
       }
     },
-    [mode, selectedAnt, slots, usageCount, fetchAddress, incrementUsage, showToast, moveToSelectedLocationsCenter]
+    [mode, selectedAnt, slots, usageCount, fetchAddress, incrementUsage, showToast, moveToSelectedLocationsCenter, updateArrowPoints]
   );
 
   // A# 버튼 클릭 핸들러
