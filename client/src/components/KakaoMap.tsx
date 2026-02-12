@@ -130,9 +130,16 @@ const KakaoMap = memo(
         const handleMapClickEvent = (mouseEvent: any) => {
           const lat = mouseEvent.latLng.getLat();
           const lng = mouseEvent.latLng.getLng();
-
-          if (onMapClick) onMapClick(lat, lng);
-
+        
+          console.log("📍 KakaoMap 클릭:", lat, lng);
+          console.log("📍 KakaoMap mode:", modeRef.current);
+        
+          // 🔥 항상 부모로 클릭 전달
+          if (onMapClick) {
+            onMapClick(lat, lng);
+          }
+        
+          // 🔥 etc의 MAP 모드일 때만 locationSelect 동작
           if (modeRef.current === "MAP" && onLocationSelect) {
             onLocationSelect({ lat, lng });
           }
