@@ -301,7 +301,12 @@ export default function Renew() {
 
   // A# 버튼 클릭 핸들러
   const handleAntButtonClick = useCallback((num: number) => {
-    setSelectedAnt(prev => prev === num ? null : num);
+    console.log("🟢 A버튼 클릭:", num);
+    setSelectedAnt(prev => {
+      const next = prev === num ? null : num;
+      console.log("selectedAnt 변경:", next);
+      return next;
+    });
   }, []);
 
   // 복사 버튼 핸들러
