@@ -20,6 +20,7 @@ interface KakaoMapProps {
   selectedLocation?: LocationData | null;
   onLocationSelect?: (location: LocationData) => void;
   onMapClick?: (lat: number, lng: number) => void;
+  isLoading?: boolean;
   mode: "MAP" | "ANT";
   initialLevel?: number;
   showCenterMarker?: boolean;
@@ -101,6 +102,7 @@ const KakaoMap = memo(
       getMap: () => mapInstance.current,
     }));
 
+    // 지도 초기화
     useEffect(() => {
       if (!window.kakao || !mapRef.current) return;
 
@@ -188,6 +190,20 @@ const KakaoMap = memo(
         }
       };
     }, []);
+
+    useEffect(() => {
+      if (!mapInstance.current || !initialLocation) return;
+    
+      console.log("📍 현재 위치 반영:", initialLocation);
+    
+      const moveLatLon = new window.kakao.maps.LatLng(
+        initialLocation.lat,
+        initialLocation.lng
+      );
+    
+      mapInstance.current.setCenter(moveLatLon);
+    
+    }, [initialLocation?.lat, initialLocation?.lng]);
 
     useEffect(() => {
       if (!mapInstance.current || !selectedLocation) return;
