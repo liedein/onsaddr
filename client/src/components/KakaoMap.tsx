@@ -192,7 +192,7 @@ const KakaoMap = memo(
     }, []);
 
     useEffect(() => {
-      if (!mapInstance.current || !initialLocation) return;
+      if (!mapInstance.current || !initialLocation || !mapReady) return;
     
       console.log("📍 현재 위치 반영:", initialLocation);
     
