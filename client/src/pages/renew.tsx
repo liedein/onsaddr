@@ -234,36 +234,51 @@ useEffect(() => {
           
           setSlots(prev => ({
             ...prev,
-            [selectedAnt]: {
-              lat,
-              lng,
-              address: data.jibunAddress || data.address,
-              roadAddress: data.roadAddress,
-              jibunAddress: data.jibunAddress,
-              direction: null, // 위치 재지정 시 방향 초기화
-            }
-          }));
-          
-          incrementUsage();
-          
-          // 위치 설정 후 지도 중심 이동 (모든 선택된 위치들의 중심으로)
-          setTimeout(() => {
-            moveToSelectedLocationsCenter();
-          }, 100);
-        } catch {
-          showToast("주소를 가져오는데 실패했습니다.", "error");
-        } finally {
-          setIsLoading(false);
-        }
+            [selectedAntRef.current as number]: {
+            lat,
+            lng,
+            address: data.jibunAddress || data.address,
+            roadAddress: data.roadAddress,
+            jibunAddress: data.jibunAddress,
+            direction: null,
+          }
+        }));
+        incrementUsage();
+        setTimeout(() => {
+          moveToSelectedLocationsCenter();
+        }, 100);
+      } catch {
+        showToast("주소를 가져오는데 실패했습니다.", "error");
+      } finally {
+        setIsLoading(false);
       }
+      
       // 방향 모드
-      else if (mode === "방향") {
+      } else if (mode === "방향") {
         // A# 버튼이 선택되지 않은 경우 → 아무 동작 없음
-        if (selectedAnt === null) return;
+        if (selectedAntRef.current === null) return;
 
+        const antKey = selectedAntRef.current;
+        if (antKey === null) return;
+        
+        try {
+          setIsLoading(true);
+          const data = await fetchAddress(lat, lng);
+          
+        setSlots(prev => ({        
+          ...prev,
+          [antKey]: {
+            lat,
+            lng,
+            address: data.jibunAddress || data.address,
+            roadAddress: data.roadAddress,
+            jibunAddress: data.jibunAddress,
+            direction: null,
+          }
+        }));
         // 선택된 버튼에 위치가 설정되어 있지 않으면 → 아무 동작 없음
-        const slot = slots[selectedAnt];
-        if (!slot) return;
+        const slot = slots[antKey];
+        if (!slot) return; 
 
         // 지도 컨테이너에서 클릭 위치 계산 (경쟁사 동향 페이지와 동일 로직)
         if (!mapContainerRef.current) return;
@@ -288,7 +303,7 @@ useEffect(() => {
         // 방향 정보 저장 (지도 중심 이동 없음)
         setSlots(prev => ({
           ...prev,
-          [selectedAnt]: {
+          [antKey]: {
             ...slot,
             direction: {
               angle: deg,
@@ -299,8 +314,13 @@ useEffect(() => {
 
         // ✅ 즉시 픽셀좌표 재계산 트리거
         setTimeout(updateArrowPoints, 0);
+        } catch {
+          showToast("주소를 가져오는데 실패했습니다.", "error");
+        } finally {
+          setIsLoading(false);
+        }
       }
-    },
+  },
     [mode, selectedAnt, slots, usageCount, fetchAddress, incrementUsage, showToast, moveToSelectedLocationsCenter, updateArrowPoints]
   );
 
