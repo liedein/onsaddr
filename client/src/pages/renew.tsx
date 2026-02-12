@@ -208,6 +208,9 @@ export default function Renew() {
   // 지도 클릭 핸들러 - 위치/방향 모드에 따라 분기
   const handleMapClick = useCallback(
     async (lat: number, lng: number) => {
+      console.log("🔥 지도 클릭 들어옴", lat, lng);
+      console.log("mode:", mode, "selectedAnt:", selectedAnt);
+      
       // 위치 모드
       if (mode === "위치") {
         // A# 버튼이 선택되지 않은 경우 → 아무 동작 없음
@@ -368,7 +371,7 @@ export default function Renew() {
             ref={mapCompRef}
             initialLocation={currentLocation}
             selectedLocation={selectedLocationForMap}
-            mode="ANT"
+            mode="MAP"
             initialLevel={2}
             showCenterMarker={false} // 초기 Pin 제거
             circlePositions={[]} // SVG로 직접 렌더링하므로 빈 배열
