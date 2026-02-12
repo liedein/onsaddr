@@ -368,7 +368,7 @@ export default function Renew() {
             ref={mapCompRef}
             initialLocation={currentLocation}
             selectedLocation={selectedLocationForMap}
-            mode="MAP"
+            mode="ANT"
             initialLevel={2}
             showCenterMarker={false} // 초기 Pin 제거
             circlePositions={[]} // SVG로 직접 렌더링하므로 빈 배열
