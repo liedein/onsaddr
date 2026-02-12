@@ -26,7 +26,6 @@ import { latToDMS, lngToDMS } from "@/lib/coordinates";
 import { copyToClipboard } from "@/lib/clipboard";
 
 const SLOT_KEYS = [1, 2, 3, 4] as const;
-const selectedAntRef = useRef<number | null>(null); // 선택된 A# 버튼 저장용
 
 /** A1~A4 색상 정의 (경쟁사 동향 페이지와 동일) */
 const antColors: Record<number, { hex: string; bg: string; active: string; inactive: string }> = {
@@ -57,6 +56,8 @@ function getArrowPoints(
 export default function Renew() {
   // 위치/방향 모드
   const [mode, setMode] = useState<"위치" | "방향">("위치");
+  
+  const selectedAntRef = useRef<number | null>(null);
   
   // A1~A4 각 슬롯 데이터 (위치 + 방향)
   const [slots, setSlots] = useState<Record<number, SlotData | null>>({
@@ -198,11 +199,11 @@ useEffect(() => {
     const avgLat = validSlots.reduce((sum, slot) => sum + slot.lat, 0) / validSlots.length;
     const avgLng = validSlots.reduce((sum, slot) => sum + slot.lng, 0) / validSlots.length;
 
-    // ✅ KakaoMapRef에 직접 메서드가 없으므로 mapInstance 사용
-    if ('mapInstance' in ref && ref.mapInstance) {
-      const latlng = new window.kakao.maps.LatLng(avgLat, avgLng);
-      (ref.mapInstance as any).setCenter(latlng);
-    }
+    const map = ref.getMap();
+    if (!map) return;
+
+    const latlng = new window.kakao.maps.LatLng(avgLat, avgLng);
+    map.setCenter(latlng);
   }, [slots]);
 
   // ✅ idle + mapReady 이후 항상 동기화
