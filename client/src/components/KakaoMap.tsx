@@ -1,3 +1,4 @@
+/** client\src\components\KakaoMap.tsx */
 import { useEffect, useRef, memo, forwardRef, useImperativeHandle, useState } from "react";
 import type { LocationData } from "@/types/map";
 
@@ -34,6 +35,7 @@ declare global {
   }
 }
 
+// forwardRef<Ref타입, Props타입>으로 정의하여 'ref' 속성 에러를 해결합니다.
 const KakaoMap = memo(
   forwardRef<KakaoMapRef, KakaoMapProps>(function KakaoMap(
     {
@@ -80,29 +82,22 @@ const KakaoMap = memo(
       getPointFromLatLng: (lat: number, lng: number) => {
         if (!mapInstance.current) return null;
         const projection = mapInstance.current.getProjection();
-        const point = projection.pointFromCoords(
-          new window.kakao.maps.LatLng(lat, lng)
-        );
+        const point = projection.pointFromCoords(new window.kakao.maps.LatLng(lat, lng));
         return point ? { x: point.x, y: point.y } : null;
       },
       setCenter: (lat: number, lng: number) => {
         if (!mapInstance.current) return;
-        mapInstance.current.setCenter(
-          new window.kakao.maps.LatLng(lat, lng)
-        );
+        mapInstance.current.setCenter(new window.kakao.maps.LatLng(lat, lng));
       },
       setBounds: (latLngs, padding = 50) => {
         if (!mapInstance.current || latLngs.length === 0) return;
         const bounds = new window.kakao.maps.LatLngBounds();
-        latLngs.forEach(({ lat, lng }) =>
-          bounds.extend(new window.kakao.maps.LatLng(lat, lng))
-        );
+        latLngs.forEach(({ lat, lng }) => bounds.extend(new window.kakao.maps.LatLng(lat, lng)));
         mapInstance.current.setBounds(bounds, padding, padding, padding, padding);
       },
       getMap: () => mapInstance.current,
     }));
 
-    // 지도 초기화
     useEffect(() => {
       if (!window.kakao || !mapRef.current) return;
 
@@ -115,10 +110,7 @@ const KakaoMap = memo(
           level: initialLevel,
         };
 
-        mapInstance.current = new window.kakao.maps.Map(
-          mapRef.current,
-          mapOption
-        );
+        mapInstance.current = new window.kakao.maps.Map(mapRef.current, mapOption);
 
         if (showCenterMarker) {
           markerInstance.current = new window.kakao.maps.Marker({
@@ -130,109 +122,50 @@ const KakaoMap = memo(
         const handleMapClickEvent = (mouseEvent: any) => {
           const lat = mouseEvent.latLng.getLat();
           const lng = mouseEvent.latLng.getLng();
-        
-          console.log("📍 KakaoMap 클릭:", lat, lng);
-          console.log("📍 KakaoMap mode:", modeRef.current);
-        
-          // 🔥 항상 부모로 클릭 전달
-          if (onMapClick) {
-            onMapClick(lat, lng);
-          }
-        
-          // 🔥 etc의 MAP 모드일 때만 locationSelect 동작
+          if (onMapClick) onMapClick(lat, lng);
           if (modeRef.current === "MAP" && onLocationSelect) {
             onLocationSelect({ lat, lng });
           }
         };
 
         clickHandlerRef.current = handleMapClickEvent;
-
-        window.kakao.maps.event.addListener(
-          mapInstance.current,
-          "click",
-          handleMapClickEvent
-        );
-
-        window.kakao.maps.event.addListener(
-          mapInstance.current,
-          "touchend",
-          handleMapClickEvent
-        );
+        window.kakao.maps.event.addListener(mapInstance.current, "click", handleMapClickEvent);
 
         if (onMapIdle) {
           const handler = () => onMapIdle();
           idleHandlerRef.current = handler;
-          window.kakao.maps.event.addListener(
-            mapInstance.current,
-            "idle",
-            handler
-          );
+          window.kakao.maps.event.addListener(mapInstance.current, "idle", handler);
         }
-
         setMapReady(true);
       });
 
       return () => {
         if (!mapInstance.current) return;
-
         if (clickHandlerRef.current) {
-          window.kakao.maps.event.removeListener(
-            mapInstance.current,
-            "click",
-            clickHandlerRef.current
-          );
-          window.kakao.maps.event.removeListener(
-            mapInstance.current,
-            "touchend",
-            clickHandlerRef.current
-          );
+          window.kakao.maps.event.removeListener(mapInstance.current, "click", clickHandlerRef.current);
         }
-
         if (idleHandlerRef.current) {
-          window.kakao.maps.event.removeListener(
-            mapInstance.current,
-            "idle",
-            idleHandlerRef.current
-          );
+          window.kakao.maps.event.removeListener(mapInstance.current, "idle", idleHandlerRef.current);
         }
       };
     }, []);
 
     useEffect(() => {
       if (!mapInstance.current || !initialLocation || !mapReady) return;
-    
-      console.log("📍 현재 위치 반영:", initialLocation);
-    
-      const moveLatLon = new window.kakao.maps.LatLng(
-        initialLocation.lat,
-        initialLocation.lng
-      );
-    
-      mapInstance.current.setCenter(moveLatLon);
-    
+      mapInstance.current.setCenter(new window.kakao.maps.LatLng(initialLocation.lat, initialLocation.lng));
     }, [initialLocation?.lat, initialLocation?.lng]);
 
     useEffect(() => {
       if (!mapInstance.current || !selectedLocation) return;
-
-      const moveLatLon = new window.kakao.maps.LatLng(
-        selectedLocation.lat,
-        selectedLocation.lng
-      );
-
-      if (markerInstance.current) {
-        markerInstance.current.setPosition(moveLatLon);
-      }
-
+      const moveLatLon = new window.kakao.maps.LatLng(selectedLocation.lat, selectedLocation.lng);
+      if (markerInstance.current) markerInstance.current.setPosition(moveLatLon);
       mapInstance.current.setCenter(moveLatLon);
     }, [selectedLocation]);
 
     useEffect(() => {
       if (!window.kakao || !mapInstance.current || !mapReady) return;
-
       circleInstances.current.forEach((c) => c.setMap(null));
       circleInstances.current = [];
-
       circlePositions.forEach((pos) => {
         const circle = new window.kakao.maps.Circle({
           center: new window.kakao.maps.LatLng(pos.lat, pos.lng),
@@ -248,7 +181,7 @@ const KakaoMap = memo(
       });
     }, [circlePositions, mapReady]);
 
-    return <div ref={mapRef} className="w-full h-full rounded-lg overflow-hidden" />;
+    return <div ref={mapRef} className="w-full h-full rounded-lg overflow-hidden" style={{ touchAction: 'none' }} />;
   })
 );
 
