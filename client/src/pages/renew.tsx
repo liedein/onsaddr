@@ -26,6 +26,7 @@ import { latToDMS, lngToDMS } from "@/lib/coordinates";
 import { copyToClipboard } from "@/lib/clipboard";
 
 const SLOT_KEYS = [1, 2, 3, 4] as const;
+const selectedAntRef = useRef<number | null>(null); // 선택된 A# 버튼 저장용
 
 /** A1~A4 색상 정의 (경쟁사 동향 페이지와 동일) */
 const antColors: Record<number, { hex: string; bg: string; active: string; inactive: string }> = {
@@ -68,6 +69,10 @@ export default function Renew() {
   // 현재 선택된 A# 버튼 (위치 모드 또는 방향 모드에서)
   const [selectedAnt, setSelectedAnt] = useState<number | null>(null);
   
+useEffect(() => {
+  selectedAntRef.current = selectedAnt;
+}, [selectedAnt]);
+
   // 패널에 표시할 위치 정보 (위치 모드에서 A# 미선택 시 사용 - 현재는 사용 안 함)
   const [panelLocation, setPanelLocation] = useState<LocationData | null>(null);
   
@@ -214,7 +219,7 @@ export default function Renew() {
       // 위치 모드
       if (mode === "위치") {
         // A# 버튼이 선택되지 않은 경우 → 아무 동작 없음
-        if (selectedAnt === null) return;
+        if (selectedAntRef.current === null) return;
 
         // 조회 한도 체크
         if (usageCount >= USAGE_LIMIT) {
@@ -301,13 +306,19 @@ export default function Renew() {
 
   // A# 버튼 클릭 핸들러
   const handleAntButtonClick = useCallback((num: number) => {
-    console.log("🟢 A버튼 클릭:", num);
+    console.log("🟢 버튼 클릭:", num);
+  
     setSelectedAnt(prev => {
+      if (mode === "위치") {
+        console.log("➡ 위치모드 selectedAnt =", num);
+        return num;
+      }
+  
       const next = prev === num ? null : num;
-      console.log("selectedAnt 변경:", next);
+      console.log("➡ 방향모드 selectedAnt =", next);
       return next;
     });
-  }, []);
+  }, [mode]);
 
   // 복사 버튼 핸들러
   const handleCopyToClipboard = useCallback(async () => {
