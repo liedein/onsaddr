@@ -183,51 +183,6 @@ const handleMapIdle = useCallback(() => {
   updateArrowPoints();
 }, [updateArrowPoints]);
 
-// 🔧 방향 모드 클릭 로직 보정
-const handleMapClick = useCallback(async (lat: number, lng: number) => {
-
-  if (mode === "방향") {
-    if (selectedAnt === null) return;
-    const slot = slots[selectedAnt];
-    if (!slot) return;
-
-    const ref = mapCompRef.current;
-    if (!ref) return;
-
-    const centerPt = ref.getPointFromLatLng(slot.lat, slot.lng);
-    const clickPt = ref.getPointFromLatLng(lat, lng);
-    if (!centerPt || !clickPt) return;
-
-    const angleRad = Math.atan2(
-      clickPt.y - centerPt.y,
-      clickPt.x - centerPt.x
-    );
-
-    let deg = Math.round(angleRad * (180 / Math.PI) + 90);
-    if (deg < 0) deg += 360;
-    if (deg >= 360) deg -= 360;
-
-    setSlots(prev => {
-      const updated = {
-        ...prev,
-        [selectedAnt]: {
-          ...slot,
-          direction: {
-            angle: deg,
-            points: getArrowPoints(centerPt.x, centerPt.y, deg),
-          }
-        }
-      };
-
-      // ✅ 즉시 픽셀좌표 재계산 트리거
-      setTimeout(updateArrowPoints, 0);
-
-      return updated;
-    });
-
-    return;
-  }
-
   // 지도 클릭 핸들러 - 위치/방향 모드에 따라 분기
   const handleMapClick = useCallback(
     async (lat: number, lng: number) => {
